@@ -260,7 +260,66 @@ app.put("/api/tasks/:taskId/status", async (req, res) => {
   }
 });
 
-// Endpoint for updating task priority
+app.delete("/api/tasks/:taskId", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    const result = await db.query(
+      "DELETE FROM tasks WHERE id = $1 RETURNING *",
+      [taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Task not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Task deleted successfully",
+      task: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+app.post("/api/tasks/delete", async (req, res) => {
+  try {
+    const { taskIds } = req.body;
+
+    if (!Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid task IDs provided",
+      });
+    }
+
+    const result = await db.query(
+      "DELETE FROM tasks WHERE id = ANY($1) RETURNING *",
+      [taskIds]
+    );
+
+    res.json({
+      success: true,
+      message: `${result.rows.length} tasks deleted successfully`,
+      tasks: result.rows,
+    });
+  } catch (error) {
+    console.error("Error deleting tasks:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 app.put("/api/tasks/:taskId/priority", async (req, res) => {
   try {
     const { taskId } = req.params;

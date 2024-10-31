@@ -49,7 +49,7 @@ const Board = forwardRef((props, ref) => {
   };
 
   useImperativeHandle(ref, () => ({
-    fetchTasks, // Expose fetchTasks through ref
+    fetchTasks,
     addTasks: async (newTasks) => {
       try {
         const response = await fetch("/api/tasks", {
@@ -142,6 +142,38 @@ const Board = forwardRef((props, ref) => {
     setIsAssignmentModalOpen(false);
   };
 
+  // New function to handle task deletion
+  const handleDeleteTask = async (taskId) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update the local state immediately for better UX
+        setColumns((prevColumns) =>
+          prevColumns.map((column) => ({
+            ...column,
+            tasks: column.tasks.filter((task) => task.id !== taskId),
+          }))
+        );
+        // Fetch the updated task list to ensure synchronization
+        await fetchTasks();
+        return true;
+      } else {
+        console.error("Failed to delete task:", data.error);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      return false;
+    }
+  };
+
   return (
     <>
       <div className="flex gap-6">
@@ -166,6 +198,7 @@ const Board = forwardRef((props, ref) => {
                     setIsAssignmentModalOpen(true);
                   }}
                   onPriorityChange={handlePriorityChange}
+                  onDelete={handleDeleteTask}
                 />
               ))}
             </div>

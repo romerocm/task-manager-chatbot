@@ -48,6 +48,21 @@ const PROMPTS = {
     }
     
     Respond with ONLY the JSON, no other text.`,
+
+    taskDeletion: `Given the request to delete tasks, determine:
+    1. Whether all tasks should be deleted
+    2. Or which specific tasks should be deleted
+
+    Response must be a JSON object with:
+    - "deleteAll": Boolean indicating if all tasks should be deleted
+    - "specificTasks": Array of task titles if not deleting all
+
+    Example format: {
+      "deleteAll": false,
+      "specificTasks": ["Setup database", "Create API"]
+    }
+    
+    Respond with ONLY the JSON, no other text.`,
   },
   [PROVIDERS.CLAUDE]: {
     taskGeneration: `Analyze this request and create specific, actionable tasks.
@@ -78,10 +93,26 @@ const PROMPTS = {
     }
     
     Return pure JSON only, no additional text.`,
+
+    taskDeletion: `Parse this request and identify:
+    1. If all tasks should be deleted
+    2. Or which specific tasks to delete
+
+    Return a JSON object with:
+    - "deleteAll": true/false for all tasks
+    - "specificTasks": Array of task titles if not deleting all
+
+    Format: {
+      "deleteAll": false,
+      "specificTasks": ["Task 1", "Task 2"]
+    }
+    
+    Return pure JSON only, no additional text.`,
   },
 };
 
-// Helper function to extract JSON from various response formats
+// Helper functions and main functionality
+
 const extractJsonFromResponse = (content) => {
   try {
     return JSON.parse(content);
@@ -113,7 +144,6 @@ async function findUserByName(name) {
     const data = await response.json();
     if (!data.success) throw new Error("Failed to fetch users");
 
-    // Find user by case-insensitive name match
     const user = data.users.find(
       (user) =>
         user.name.toLowerCase() === name.toLowerCase() ||
@@ -137,23 +167,6 @@ async function getAllTasks() {
   } catch (error) {
     console.error("Error fetching tasks:", error);
     return [];
-  }
-}
-
-// Function to assign task to user
-async function assignTask(taskId, userId) {
-  try {
-    const response = await fetch(`/api/tasks/${taskId}/assign`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assigneeId: userId }),
-    });
-
-    const data = await response.json();
-    return data.success;
-  } catch (error) {
-    console.error("Error assigning task:", error);
-    return false;
   }
 }
 
@@ -257,11 +270,9 @@ async function generateTasks(
   }
 }
 
-/// Update the processTaskAssignments function in aiService.js - Just update this specific function
-
+// Process task assignments
 async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
   try {
-    // Get assignment instructions from AI
     const aiResult = await generateTasks(
       prompt,
       provider,
@@ -274,13 +285,11 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
 
     const assignmentData = aiResult.data;
 
-    // Find the user
     const user = await findUserByName(assignmentData.assigneeName);
     if (!user) {
       throw new Error(`Could not find user "${assignmentData.assigneeName}"`);
     }
 
-    // Get tasks to assign
     const allTasks = await getAllTasks();
     let tasksToAssign = [];
 
@@ -298,13 +307,17 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
       throw new Error("No matching tasks found to assign");
     }
 
-    // Perform assignments
     const results = await Promise.all(
-      tasksToAssign.map((task) => assignTask(task.id, user.id))
+      tasksToAssign.map((task) =>
+        fetch(`/api/tasks/${task.id}/assign`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assigneeId: user.id }),
+        }).then((res) => res.json())
+      )
     );
 
-    // Count successful assignments
-    const successCount = results.filter(Boolean).length;
+    const successCount = results.filter((r) => r.success).length;
 
     return {
       success: true,
@@ -314,7 +327,7 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
         message: `Assigned ${successCount} task${
           successCount !== 1 ? "s" : ""
         } to ${user.name}`,
-        tasksUpdated: true, // Add this flag to indicate tasks were updated
+        tasksUpdated: true,
       },
     };
   } catch (error) {
@@ -327,4 +340,72 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
   }
 }
 
-export { generateTasks, processTaskAssignments, PROVIDERS };
+// Process task deletions
+async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
+  try {
+    const aiResult = await generateTasks(
+      prompt,
+      provider,
+      PROMPTS[provider].taskDeletion
+    );
+
+    if (!aiResult.success) {
+      throw new Error(aiResult.error || "Failed to process deletion request");
+    }
+
+    const deleteData = aiResult.data;
+    const allTasks = await getAllTasks();
+    let tasksToDelete = [];
+
+    if (deleteData.deleteAll) {
+      tasksToDelete = allTasks;
+    } else if (deleteData.specificTasks?.length > 0) {
+      tasksToDelete = allTasks.filter((task) =>
+        deleteData.specificTasks.some((title) =>
+          task.title.toLowerCase().includes(title.toLowerCase())
+        )
+      );
+    }
+
+    if (tasksToDelete.length === 0) {
+      throw new Error("No matching tasks found to delete");
+    }
+
+    // Delete tasks
+    const response = await fetch("/api/tasks/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskIds: tasksToDelete.map((t) => t.id) }),
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || "Failed to delete tasks");
+    }
+
+    return {
+      success: true,
+      data: {
+        deletedCount: result.tasks.length,
+        message: `Deleted ${result.tasks.length} task${
+          result.tasks.length !== 1 ? "s" : ""
+        }`,
+        tasksUpdated: true,
+      },
+    };
+  } catch (error) {
+    console.error("Error in processTaskDeletions:", error);
+    return {
+      success: false,
+      error: error.message,
+      tasksUpdated: false,
+    };
+  }
+}
+
+export {
+  generateTasks,
+  processTaskAssignments,
+  processTaskDeletions,
+  PROVIDERS,
+};

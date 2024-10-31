@@ -4,6 +4,7 @@ import { Send } from "lucide-react";
 import {
   generateTasks,
   processTaskAssignments,
+  processTaskDeletions,
 } from "../../services/aiService";
 import Message from "./Message";
 
@@ -63,6 +64,20 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     );
   };
 
+  const parseDeletionIntent = (input) => {
+    const deletionKeywords = [
+      "delete",
+      "remove",
+      "clear",
+      "erase",
+      "get rid of",
+    ];
+
+    return deletionKeywords.some((keyword) =>
+      input.toLowerCase().includes(keyword.toLowerCase())
+    );
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -80,8 +95,27 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
 
     try {
       const isAssignmentRequest = parseAssignmentIntent(input);
+      const isDeletionRequest = parseDeletionIntent(input);
 
-      if (isAssignmentRequest) {
+      if (isDeletionRequest) {
+        console.log("Processing deletion request:", input);
+        const result = await processTaskDeletions(input);
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to process deletions");
+        }
+
+        const deletionMessage = {
+          id: Date.now() + 1,
+          text: result.data.message,
+          sender: "ai",
+        };
+        setMessages((prev) => [...prev, deletionMessage]);
+
+        if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
+          await boardRef.current.fetchTasks();
+        }
+      } else if (isAssignmentRequest) {
         console.log("Processing assignment request:", input);
         const result = await processTaskAssignments(input);
 
@@ -96,7 +130,6 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         };
         setMessages((prev) => [...prev, assignmentMessage]);
 
-        // Refresh the board to show updated assignments
         if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
         }
@@ -159,7 +192,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       <div className="p-4 border-b">
         <h2 className="font-semibold">AI Task Assistant</h2>
         <p className="text-sm text-gray-600">
-          I can help create and assign tasks!
+          I can help create, assign, and manage tasks!
         </p>
         {error && <div className="mt-2 text-sm text-red-500">{error}</div>}
       </div>
