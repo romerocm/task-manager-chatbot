@@ -5,7 +5,10 @@ const Task = ({
   id,
   title,
   description,
-  assignee,
+  priority,
+  estimatedTime,
+  assignee_name,
+  assignee_avatar,
   onDragStart,
   onAssignClick,
 }) => {
@@ -28,30 +31,49 @@ const Task = ({
       onClick={handleClick}
     >
       <div className="flex justify-between items-start">
-        <h3 className="font-medium">{title}</h3>
+        <div className="flex-1">
+          <h3 className="font-medium">{title}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className={`text-xs px-2 py-1 rounded-full ${
+                priority === "high"
+                  ? "bg-red-100 text-red-700"
+                  : priority === "medium"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-green-100 text-green-700"
+              }`}
+            >
+              {priority}
+            </span>
+            {estimatedTime && (
+              <span className="text-xs text-gray-500">{estimatedTime}m</span>
+            )}
+          </div>
+        </div>
         <button
           onClick={handleAssignClick}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 hover:bg-gray-100 rounded ml-2"
+          title={assignee_name || "Assign task"}
         >
-          {assignee ? (
+          {assignee_avatar ? (
             <img
-              src={assignee.avatar}
-              alt={assignee.name}
-              title={assignee.name}
+              src={assignee_avatar}
+              alt={assignee_name}
               className="w-6 h-6 rounded-full"
             />
           ) : (
-            <UserCircle size={20} className="text-gray-400" />
+            <UserCircle className="w-6 h-6 text-gray-400" />
           )}
         </button>
       </div>
-      {isExpanded && (
-        <div className="mt-2 space-y-2">
+
+      {isExpanded && description && (
+        <div className="mt-2">
           <p className="text-sm text-gray-600">{description}</p>
-          {assignee && (
-            <div className="text-sm text-gray-500">
-              Assigned to: {assignee.name}
-            </div>
+          {assignee_name && (
+            <p className="text-xs text-gray-500 mt-2">
+              Assigned to: {assignee_name}
+            </p>
           )}
         </div>
       )}

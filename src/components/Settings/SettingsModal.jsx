@@ -1,3 +1,4 @@
+// src/components/Settings/SettingsModal.jsx
 import React, { useState, useEffect } from "react";
 import { Settings, X, Eye, EyeOff, Save } from "lucide-react";
 
@@ -11,6 +12,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     anthropic: false,
   });
   const [status, setStatus] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -20,22 +22,30 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   const fetchCurrentKeys = async () => {
     try {
+      setIsLoading(true);
       const response = await fetch("/api/keys");
       const data = await response.json();
+
       if (data.success) {
         setKeys({
           VITE_OPENAI_API_KEY: data.keys.VITE_OPENAI_API_KEY || "",
           VITE_ANTHROPIC_API_KEY: data.keys.VITE_ANTHROPIC_API_KEY || "",
         });
+      } else {
+        setStatus("Error fetching current keys: " + data.error);
       }
     } catch (error) {
+      console.error("Error fetching keys:", error);
       setStatus("Error fetching current keys");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus("Saving...");
+    setIsLoading(true);
 
     try {
       const response = await fetch("/api/keys", {
@@ -45,6 +55,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
       });
 
       const data = await response.json();
+
       if (data.success) {
         setStatus("Keys saved successfully!");
         setTimeout(() => {
@@ -52,10 +63,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
           window.location.reload();
         }, 1500);
       } else {
-        setStatus("Error saving keys: " + data.error);
+        setStatus("Error saving keys: " + (data.error || "Unknown error"));
       }
     } catch (error) {
-      setStatus("Error saving keys");
+      console.error("Error saving keys:", error);
+      setStatus("Error saving keys: " + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -67,6 +81,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-gray-500 hover:text-gray-700"
+          disabled={isLoading}
         >
           <X size={20} />
         </button>
@@ -93,6 +108,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 }
                 className="w-full px-4 py-2 border rounded-lg pr-10"
                 placeholder="Enter OpenAI API key"
+                disabled={isLoading}
               />
               <button
                 type="button"
@@ -103,6 +119,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   }))
                 }
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
+                disabled={isLoading}
               >
                 {showKeys.openai ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -125,6 +142,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 }
                 className="w-full px-4 py-2 border rounded-lg pr-10"
                 placeholder="Enter Anthropic API key"
+                disabled={isLoading}
               />
               <button
                 type="button"
@@ -135,6 +153,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   }))
                 }
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500"
+                disabled={isLoading}
               >
                 {showKeys.anthropic ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -156,15 +175,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+              className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 ${
+                isLoading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={isLoading}
             >
               <Save size={20} />
-              Save Keys
+              {isLoading ? "Saving..." : "Save Keys"}
             </button>
           </div>
         </form>
