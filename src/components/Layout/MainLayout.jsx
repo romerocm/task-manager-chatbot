@@ -30,7 +30,7 @@ const MainLayout = () => {
         <Board ref={boardRef} />
       </div>
       <div className="w-96 border-l border-gray-200 bg-white">
-        <ChatBot onTasksGenerated={handleTasksGenerated} />
+        <ChatBot onTasksGenerated={handleTasksGenerated} boardRef={boardRef} />
       </div>
       <SettingsModal
         isOpen={isSettingsOpen}

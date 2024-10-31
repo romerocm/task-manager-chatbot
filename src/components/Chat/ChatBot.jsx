@@ -1,18 +1,32 @@
-import React, { useState, useEffect } from "react";
+// src/components/Chat/ChatBot.jsx
+import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
-import { generateTasks } from "../../services/aiService";
+import {
+  generateTasks,
+  processTaskAssignments,
+} from "../../services/aiService";
 import Message from "./Message";
 
-const ChatBox = ({ onTasksGenerated }) => {
+const ChatBot = ({ onTasksGenerated, boardRef }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const messagesEndRef = useRef(null);
 
   // Check API configuration on component mount
   useEffect(() => {
     checkApiConfig();
   }, []);
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const checkApiConfig = async () => {
     try {
@@ -28,6 +42,23 @@ const ChatBox = ({ onTasksGenerated }) => {
       setError("Error checking API configuration");
       console.error("API config check error:", err);
     }
+  };
+
+  const parseAssignmentIntent = (input) => {
+    const assignmentKeywords = [
+      "assign",
+      "give to",
+      "set assignee",
+      "delegate to",
+      "put",
+      "task for",
+      "should be done by",
+      "is responsible for",
+    ];
+
+    return assignmentKeywords.some((keyword) =>
+      input.toLowerCase().includes(keyword.toLowerCase())
+    );
   };
 
   const handleSend = async () => {
@@ -46,34 +77,79 @@ const ChatBox = ({ onTasksGenerated }) => {
     setInput("");
 
     try {
-      console.log("Generating tasks with input:", input);
-      const result = await generateTasks(input);
-      console.log("Generate tasks result:", result);
+      // Check if this is an assignment request
+      const isAssignmentRequest = parseAssignmentIntent(input);
 
-      if (!result.success) {
-        throw new Error(result.error || "Failed to generate tasks");
-      }
+      if (isAssignmentRequest) {
+        console.log("Processing assignment request:", input);
+        const result = await processTaskAssignments(input);
 
-      const tasks = result.data;
+        if (!result.success) {
+          throw new Error(result.error || "Failed to process assignments");
+        }
 
-      const aiMessage = {
-        id: Date.now() + 1,
-        text: `I've created ${tasks.length} tasks based on your request. Check the board to see them!`,
-        sender: "ai",
-      };
+        const assignments = result.data;
+        if (assignments.length > 0) {
+          // Update assignments through the board ref
+          assignments.forEach((assignment) => {
+            const user = {
+              id: Date.now(),
+              name: assignment.assignee,
+              avatar: "/api/placeholder/32/32",
+            };
+            boardRef.current?.assignTask(assignment.taskTitle, user);
+          });
 
-      setMessages((prev) => [...prev, aiMessage]);
+          const aiMessage = {
+            id: Date.now() + 1,
+            text: `I've updated the assignments for ${
+              assignments.length
+            } task(s):\n${assignments
+              .map((a) => `- "${a.taskTitle}" assigned to ${a.assignee}`)
+              .join("\n")}`,
+            sender: "ai",
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+        } else {
+          const aiMessage = {
+            id: Date.now() + 1,
+            text: "I couldn't find any matching tasks to assign. Please make sure the task titles match exactly.",
+            sender: "ai",
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+        }
+      } else {
+        // Handle regular task generation
+        console.log("Generating new tasks:", input);
+        const result = await generateTasks(input);
 
-      if (tasks.length > 0) {
-        onTasksGenerated(tasks);
+        if (!result.success) {
+          throw new Error(result.error || "Failed to generate tasks");
+        }
+
+        const tasks = result.data;
+        const aiMessage = {
+          id: Date.now() + 1,
+          text: `I've created ${
+            tasks.length
+          } tasks based on your request:\n${tasks
+            .map((t) => `- ${t.title}`)
+            .join("\n")}`,
+          sender: "ai",
+        };
+
+        setMessages((prev) => [...prev, aiMessage]);
+
+        if (tasks.length > 0) {
+          onTasksGenerated(tasks);
+        }
       }
     } catch (error) {
       console.error("Error in handleSend:", error);
       const errorMessage = {
         id: Date.now() + 1,
         text: `Error: ${
-          error.message ||
-          "Couldn't generate tasks. Please check your API configuration."
+          error.message || "Something went wrong. Please try again."
         }`,
         sender: "ai",
       };
@@ -84,12 +160,25 @@ const ChatBox = ({ onTasksGenerated }) => {
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const getPlaceholderText = () => {
+    if (error) return "Please configure API keys in settings...";
+    if (isLoading) return "Processing...";
+    return "Ask me to create tasks or assign them to team members...";
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="font-semibold">AI Task Assistant</h2>
         <p className="text-sm text-gray-600">
-          Ask me to help you create tasks!
+          I can help create and assign tasks!
         </p>
         {error && <div className="mt-2 text-sm text-red-500">{error}</div>}
       </div>
@@ -103,24 +192,26 @@ const ChatBox = ({ onTasksGenerated }) => {
             <div className="animate-pulse text-gray-500">Thinking...</div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="p-4 border-t">
         <div className="flex items-center gap-2">
-          <input
-            type="text"
+          <textarea
+            rows="1"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Describe the tasks you need..."
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onKeyPress={(e) => e.key === "Enter" && handleSend()}
+            onKeyPress={handleKeyPress}
+            placeholder={getPlaceholderText()}
             disabled={isLoading}
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            style={{ minHeight: "42px", maxHeight: "120px" }}
           />
           <button
             onClick={handleSend}
-            disabled={isLoading}
+            disabled={isLoading || !input.trim()}
             className={`p-2 rounded-lg ${
-              isLoading
+              isLoading || !input.trim()
                 ? "bg-gray-300 cursor-not-allowed"
                 : "bg-blue-500 hover:bg-blue-600 text-white"
             }`}
@@ -133,4 +224,4 @@ const ChatBox = ({ onTasksGenerated }) => {
   );
 };
 
-export default ChatBox;
+export default ChatBot;
