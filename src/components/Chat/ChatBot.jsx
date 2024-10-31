@@ -47,13 +47,15 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
   const parseAssignmentIntent = (input) => {
     const assignmentKeywords = [
       "assign",
-      "give to",
+      "give",
       "set assignee",
-      "delegate to",
+      "delegate",
       "put",
-      "task for",
+      "give to",
       "should be done by",
       "is responsible for",
+      "assign all",
+      "assign everything",
     ];
 
     return assignmentKeywords.some((keyword) =>
@@ -77,7 +79,6 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     setInput("");
 
     try {
-      // Check if this is an assignment request
       const isAssignmentRequest = parseAssignmentIntent(input);
 
       if (isAssignmentRequest) {
@@ -88,39 +89,19 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           throw new Error(result.error || "Failed to process assignments");
         }
 
-        const assignments = result.data;
-        if (assignments.length > 0) {
-          // Update assignments through the board ref
-          assignments.forEach((assignment) => {
-            const user = {
-              id: Date.now(),
-              name: assignment.assignee,
-              avatar: "/api/placeholder/32/32",
-            };
-            boardRef.current?.assignTask(assignment.taskTitle, user);
-          });
+        const assignmentMessage = {
+          id: Date.now() + 1,
+          text: result.data.message,
+          sender: "ai",
+        };
+        setMessages((prev) => [...prev, assignmentMessage]);
 
-          const aiMessage = {
-            id: Date.now() + 1,
-            text: `I've updated the assignments for ${
-              assignments.length
-            } task(s):\n${assignments
-              .map((a) => `- "${a.taskTitle}" assigned to ${a.assignee}`)
-              .join("\n")}`,
-            sender: "ai",
-          };
-          setMessages((prev) => [...prev, aiMessage]);
-        } else {
-          const aiMessage = {
-            id: Date.now() + 1,
-            text: "I couldn't find any matching tasks to assign. Please make sure the task titles match exactly.",
-            sender: "ai",
-          };
-          setMessages((prev) => [...prev, aiMessage]);
+        // Refresh the board to show updated assignments
+        if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
+          await boardRef.current.fetchTasks();
         }
       } else {
         // Handle regular task generation
-        console.log("Generating new tasks:", input);
         const result = await generateTasks(input);
 
         if (!result.success) {

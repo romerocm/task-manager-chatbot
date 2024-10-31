@@ -25,15 +25,29 @@ const PROMPTS = {
     
     Respond with ONLY the JSON array, no other text or formatting.`,
 
-    taskAssignment: `Analyze the following request to assign tasks and identify which tasks should be assigned to whom.
-    Response must be a plain JSON array where each object has:
-    - "taskTitle": The exact title of the task to be assigned
-    - "assignee": The name of the person to assign the task to
+    taskAssignment: `Given the request to assign tasks, determine:
+    1. The assignee name from the request
+    2. Which tasks should be assigned
+
+    Response must be a JSON object with:
+    - "assigneeName": The full name of the person to assign tasks to
+    - "assignAll": Boolean indicating if all tasks should be assigned
+    - "specificTasks": Array of task titles if not assigning all tasks
+
+    Example format: {
+      "assigneeName": "Carlos Romero",
+      "assignAll": true,
+      "specificTasks": []
+    }
     
-    Example format: [{"taskTitle":"Setup database","assignee":"John Doe"}]
-    Only include tasks that need assignment changes.
+    Or for specific tasks:
+    {
+      "assigneeName": "Carlos Romero",
+      "assignAll": false,
+      "specificTasks": ["Setup database", "Create API"]
+    }
     
-    Respond with ONLY the JSON array, no other text or formatting.`,
+    Respond with ONLY the JSON, no other text.`,
   },
   [PROVIDERS.CLAUDE]: {
     taskGeneration: `Analyze this request and create specific, actionable tasks.
@@ -48,41 +62,22 @@ const PROMPTS = {
     
     Ensure response is pure JSON array. No additional text or explanation.`,
 
-    taskAssignment: `Parse this request and identify task assignments.
-    Return a JSON array where each object has:
-    - "taskTitle": Exact title of the task to assign
-    - "assignee": Name of person to assign to
-    
-    Format: [{"taskTitle": "...", "assignee": "..."}]
-    Include only tasks needing assignment changes.
-    
-    Return pure JSON array only, no additional text.`,
-  },
-};
+    taskAssignment: `Parse this request and identify:
+    1. Who should be assigned tasks
+    2. Whether all tasks or specific ones should be assigned
 
-// Error messages for different API status codes
-const API_ERRORS = {
-  [PROVIDERS.OPENAI]: {
-    400: "Invalid request to OpenAI API. Please check your input.",
-    401: "Invalid OpenAI API key. Please check your credentials.",
-    403: "OpenAI API access forbidden. Please check your subscription.",
-    404: "OpenAI API endpoint not found.",
-    429: "OpenAI API rate limit exceeded. Please try again later.",
-    500: "OpenAI service error. Please try again later.",
-    502: "OpenAI service is temporarily unavailable.",
-    503: "OpenAI service is temporarily unavailable.",
-    default: "An error occurred while connecting to OpenAI.",
-  },
-  [PROVIDERS.CLAUDE]: {
-    400: "Invalid request to Claude API. Please check your input.",
-    401: "Invalid Claude API key. Please check your credentials.",
-    403: "Claude API access forbidden. Please check your subscription.",
-    404: "Claude API endpoint not found.",
-    429: "Claude API rate limit exceeded. Please try again later.",
-    500: "Claude service error. Please try again later.",
-    502: "Claude service is temporarily unavailable.",
-    503: "Claude service is temporarily unavailable.",
-    default: "An error occurred while connecting to Claude.",
+    Return a JSON object with:
+    - "assigneeName": Full name of assignee
+    - "assignAll": true/false for all tasks
+    - "specificTasks": Array of task titles if not all
+
+    Format: {
+      "assigneeName": "Carlos Romero",
+      "assignAll": true,
+      "specificTasks": []
+    }
+    
+    Return pure JSON only, no additional text.`,
   },
 };
 
@@ -111,46 +106,63 @@ const extractJsonFromResponse = (content) => {
   }
 };
 
-// Validate JSON response from AI
-const validateTasksResponse = (tasks) => {
-  if (!Array.isArray(tasks)) {
-    throw new Error("Invalid response format: not an array");
+// Function to find user by name
+async function findUserByName(name) {
+  try {
+    const response = await fetch("/api/users");
+    const data = await response.json();
+    if (!data.success) throw new Error("Failed to fetch users");
+
+    // Find user by case-insensitive name match
+    const user = data.users.find(
+      (user) =>
+        user.name.toLowerCase() === name.toLowerCase() ||
+        user.name.toLowerCase().includes(name.toLowerCase())
+    );
+
+    return user;
+  } catch (error) {
+    console.error("Error finding user:", error);
+    return null;
   }
+}
 
-  const requiredFields = [
-    "title",
-    "description",
-    "priority",
-    "estimatedTime",
-    "status",
-  ];
-  const validPriorities = ["high", "medium", "low"];
+// Function to get all tasks
+async function getAllTasks() {
+  try {
+    const response = await fetch("/api/tasks");
+    const data = await response.json();
+    if (!data.success) throw new Error("Failed to fetch tasks");
+    return data.tasks;
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
+    return [];
+  }
+}
 
-  tasks.forEach((task, index) => {
-    requiredFields.forEach((field) => {
-      if (!task[field]) {
-        throw new Error(
-          `Task ${index + 1} is missing required field: ${field}`
-        );
-      }
+// Function to assign task to user
+async function assignTask(taskId, userId) {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}/assign`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assigneeId: userId }),
     });
 
-    if (!validPriorities.includes(task.priority)) {
-      throw new Error(
-        `Task ${index + 1} has invalid priority: ${task.priority}`
-      );
-    }
+    const data = await response.json();
+    return data.success;
+  } catch (error) {
+    console.error("Error assigning task:", error);
+    return false;
+  }
+}
 
-    if (typeof task.estimatedTime !== "number" || task.estimatedTime <= 0) {
-      throw new Error(`Task ${index + 1} has invalid estimatedTime`);
-    }
-  });
-
-  return tasks;
-};
-
-// Main function to generate tasks
-async function generateTasks(prompt, provider = PROVIDERS.OPENAI) {
+// Generate tasks using AI
+async function generateTasks(
+  prompt,
+  provider = PROVIDERS.OPENAI,
+  customPrompt = null
+) {
   console.log("generateTasks called with provider:", provider);
   try {
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -181,12 +193,12 @@ async function generateTasks(prompt, provider = PROVIDERS.OPENAI) {
             {
               role: "system",
               content:
-                "You are a task generation assistant. Always respond with plain JSON arrays only.",
+                "You are a task management assistant. Always respond with plain JSON only.",
             },
             {
               role: "user",
               content: `${
-                PROMPTS[PROVIDERS.OPENAI].taskGeneration
+                customPrompt || PROMPTS[PROVIDERS.OPENAI].taskGeneration
               }\n\nRequest: ${prompt}`,
             },
           ],
@@ -207,7 +219,7 @@ async function generateTasks(prompt, provider = PROVIDERS.OPENAI) {
             {
               role: "user",
               content: `${
-                PROMPTS[PROVIDERS.CLAUDE].taskGeneration
+                customPrompt || PROMPTS[PROVIDERS.CLAUDE].taskGeneration
               }\n\nRequest: ${prompt}`,
             },
           ],
@@ -220,22 +232,21 @@ async function generateTasks(prompt, provider = PROVIDERS.OPENAI) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("API Error:", errorData);
-      const error =
-        API_ERRORS[provider][response.status] || API_ERRORS[provider].default;
-      throw new Error(`${error} (Status: ${response.status})`);
+      throw new Error(
+        `API request failed with status ${response.status}: ${
+          errorData.error?.message || "Unknown error"
+        }`
+      );
     }
 
     const data = await response.json();
-    let tasks;
+    const content =
+      provider === PROVIDERS.OPENAI
+        ? data.choices[0].message.content
+        : data.content[0].text;
 
-    if (provider === PROVIDERS.OPENAI) {
-      tasks = extractJsonFromResponse(data.choices[0].message.content);
-    } else {
-      tasks = extractJsonFromResponse(data.content[0].text);
-    }
-
-    const validatedTasks = validateTasksResponse(tasks);
-    return { success: true, data: validatedTasks };
+    const parsedData = extractJsonFromResponse(content);
+    return { success: true, data: parsedData };
   } catch (error) {
     console.error("Error in generateTasks:", error);
     return {
@@ -246,112 +257,74 @@ async function generateTasks(prompt, provider = PROVIDERS.OPENAI) {
   }
 }
 
-// Function to process task assignments
+/// Update the processTaskAssignments function in aiService.js - Just update this specific function
+
 async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
-  console.log("Processing task assignment request:", prompt);
-
   try {
-    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-      throw new Error("Invalid prompt: Please provide a non-empty text prompt");
+    // Get assignment instructions from AI
+    const aiResult = await generateTasks(
+      prompt,
+      provider,
+      PROMPTS[provider].taskAssignment
+    );
+
+    if (!aiResult.success) {
+      throw new Error(aiResult.error || "Failed to process assignment request");
     }
 
-    const hasOpenAI = !!import.meta.env.VITE_OPENAI_API_KEY;
-    const hasClaude = !!import.meta.env.VITE_ANTHROPIC_API_KEY;
+    const assignmentData = aiResult.data;
 
-    if (provider === PROVIDERS.OPENAI && !hasOpenAI) {
-      throw new Error("OpenAI API key not configured");
-    }
-    if (provider === PROVIDERS.CLAUDE && !hasClaude) {
-      throw new Error("Claude API key not configured");
+    // Find the user
+    const user = await findUserByName(assignmentData.assigneeName);
+    if (!user) {
+      throw new Error(`Could not find user "${assignmentData.assigneeName}"`);
     }
 
-    let response;
-    if (provider === PROVIDERS.OPENAI) {
-      response = await fetch(API_ENDPOINTS[PROVIDERS.OPENAI], {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a task assignment assistant. Always respond with plain JSON arrays only.",
-            },
-            {
-              role: "user",
-              content: `${
-                PROMPTS[PROVIDERS.OPENAI].taskAssignment
-              }\n\nRequest: ${prompt}`,
-            },
-          ],
-          max_tokens: 1000,
-          temperature: 0.7,
-        }),
-      });
-    } else if (provider === PROVIDERS.CLAUDE) {
-      response = await fetch(API_ENDPOINTS[PROVIDERS.CLAUDE], {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: `${
-                PROMPTS[PROVIDERS.CLAUDE].taskAssignment
-              }\n\nRequest: ${prompt}`,
-            },
-          ],
-          model: "claude-3-opus-20240229",
-          max_tokens: 1024,
-        }),
-      });
+    // Get tasks to assign
+    const allTasks = await getAllTasks();
+    let tasksToAssign = [];
+
+    if (assignmentData.assignAll) {
+      tasksToAssign = allTasks;
+    } else if (assignmentData.specificTasks?.length > 0) {
+      tasksToAssign = allTasks.filter((task) =>
+        assignmentData.specificTasks.some((title) =>
+          task.title.toLowerCase().includes(title.toLowerCase())
+        )
+      );
     }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("API Error:", errorData);
-      const error =
-        API_ERRORS[provider][response.status] || API_ERRORS[provider].default;
-      throw new Error(`${error} (Status: ${response.status})`);
+    if (tasksToAssign.length === 0) {
+      throw new Error("No matching tasks found to assign");
     }
 
-    const data = await response.json();
-    let assignments;
+    // Perform assignments
+    const results = await Promise.all(
+      tasksToAssign.map((task) => assignTask(task.id, user.id))
+    );
 
-    if (provider === PROVIDERS.OPENAI) {
-      assignments = extractJsonFromResponse(data.choices[0].message.content);
-    } else {
-      assignments = extractJsonFromResponse(data.content[0].text);
-    }
+    // Count successful assignments
+    const successCount = results.filter(Boolean).length;
 
-    if (!Array.isArray(assignments)) {
-      throw new Error("Invalid response format: not an array");
-    }
-
-    assignments.forEach((assignment, index) => {
-      if (!assignment.taskTitle || !assignment.assignee) {
-        throw new Error(`Assignment ${index + 1} is missing required fields`);
-      }
-    });
-
-    return { success: true, data: assignments };
+    return {
+      success: true,
+      data: {
+        assignedCount: successCount,
+        assigneeName: user.name,
+        message: `Assigned ${successCount} task${
+          successCount !== 1 ? "s" : ""
+        } to ${user.name}`,
+        tasksUpdated: true, // Add this flag to indicate tasks were updated
+      },
+    };
   } catch (error) {
     console.error("Error in processTaskAssignments:", error);
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString(),
+      tasksUpdated: false,
     };
   }
 }
 
-// Export all necessary functions and constants
 export { generateTasks, processTaskAssignments, PROVIDERS };

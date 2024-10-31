@@ -29,18 +29,15 @@ const updateEnvFile = async (keys) => {
     const envPath = join(process.cwd(), ".env");
     let envContent = "";
 
-    // Try to read existing content
     try {
       envContent = await readFile(envPath, "utf8");
     } catch (error) {
       console.log("No existing .env file, creating new one");
     }
 
-    // Parse existing env content
     const envLines = envContent.split("\n").filter((line) => line.trim());
     const envMap = new Map();
 
-    // Parse existing variables
     envLines.forEach((line) => {
       const [key, ...valueParts] = line.split("=");
       if (key) {
@@ -48,7 +45,6 @@ const updateEnvFile = async (keys) => {
       }
     });
 
-    // Update with new values
     if (keys.VITE_OPENAI_API_KEY !== undefined) {
       envMap.set("VITE_OPENAI_API_KEY", keys.VITE_OPENAI_API_KEY);
     }
@@ -56,17 +52,14 @@ const updateEnvFile = async (keys) => {
       envMap.set("VITE_ANTHROPIC_API_KEY", keys.VITE_ANTHROPIC_API_KEY);
     }
 
-    // Convert map back to .env format
     const newEnvContent =
       Array.from(envMap.entries())
         .map(([key, value]) => `${key}=${value}`)
         .join("\n") + "\n";
 
-    // Write the file
     await writeFile(envPath, newEnvContent, "utf8");
     console.log(".env file updated successfully");
 
-    // Update process.env
     Object.entries(keys).forEach(([key, value]) => {
       if (value !== undefined) {
         process.env[key] = value;
@@ -79,11 +72,6 @@ const updateEnvFile = async (keys) => {
     throw error;
   }
 };
-
-// Health check endpoint
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
 
 // API endpoints for managing API keys
 app.post("/api/keys", async (req, res) => {
@@ -146,6 +134,11 @@ app.get("/api/keys/test", async (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 // User management endpoints
 app.get("/api/users", async (req, res) => {
   try {
@@ -153,20 +146,6 @@ app.get("/api/users", async (req, res) => {
     res.json({ success: true, users: result.rows });
   } catch (error) {
     console.error("Error fetching users:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.get("/api/users/:id", async (req, res) => {
-  try {
-    const result = await db.query("SELECT * FROM users WHERE id = $1", [
-      req.params.id,
-    ]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-    res.json({ success: true, user: result.rows[0] });
-  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -266,10 +245,7 @@ app.put("/api/tasks/:taskId/status", async (req, res) => {
     const { status } = req.body;
 
     const result = await db.query(
-      `UPDATE tasks 
-       SET status = $1, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $2 
-       RETURNING *`,
+      "UPDATE tasks SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
       [status, taskId]
     );
 
@@ -284,7 +260,62 @@ app.put("/api/tasks/:taskId/status", async (req, res) => {
   }
 });
 
-// Server startup
+// Endpoint for updating task priority
+app.put("/api/tasks/:taskId/priority", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { priority } = req.body;
+
+    // Validate priority
+    const validPriorities = ["high", "medium", "low"];
+    if (!validPriorities.includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid priority value",
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE tasks 
+       SET priority = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [priority, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Task not found",
+      });
+    }
+
+    // Get the updated task with assignee information
+    const taskWithAssignee = await db.query(
+      `SELECT 
+        t.*,
+        u.name as assignee_name,
+        u.email as assignee_email,
+        u.avatar_url as assignee_avatar
+       FROM tasks t
+       LEFT JOIN users u ON t.assignee_id = u.id
+       WHERE t.id = $1`,
+      [taskId]
+    );
+
+    res.json({
+      success: true,
+      task: taskWithAssignee.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating task priority:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 const port = process.env.PORT || 3000;
 
 async function startServer() {

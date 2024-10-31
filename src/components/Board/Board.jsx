@@ -16,10 +16,6 @@ const Board = forwardRef((props, ref) => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
   const fetchTasks = async () => {
     try {
       const response = await fetch("/api/tasks");
@@ -38,6 +34,10 @@ const Board = forwardRef((props, ref) => {
     }
   };
 
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
   const organizeTasksByStatus = (tasks) => {
     return tasks.reduce((acc, task) => {
       if (!acc[task.status]) {
@@ -49,6 +49,7 @@ const Board = forwardRef((props, ref) => {
   };
 
   useImperativeHandle(ref, () => ({
+    fetchTasks, // Expose fetchTasks through ref
     addTasks: async (newTasks) => {
       try {
         const response = await fetch("/api/tasks", {
@@ -59,26 +60,28 @@ const Board = forwardRef((props, ref) => {
 
         const data = await response.json();
         if (data.success) {
-          await fetchTasks(); // Refresh all tasks
+          await fetchTasks();
         }
       } catch (error) {
         console.error("Error adding tasks:", error);
       }
     },
-    assignTask: async (taskId, assignee) => {
+    assignTask: async (taskId, user) => {
       try {
         const response = await fetch(`/api/tasks/${taskId}/assign`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assigneeId: assignee.id }),
+          body: JSON.stringify({ assigneeId: user.id }),
         });
 
         const data = await response.json();
         if (data.success) {
-          await fetchTasks(); // Refresh all tasks
+          await fetchTasks();
         }
+        return data.success;
       } catch (error) {
         console.error("Error assigning task:", error);
+        return false;
       }
     },
   }));
@@ -102,11 +105,41 @@ const Board = forwardRef((props, ref) => {
       });
 
       if (response.ok) {
-        await fetchTasks(); // Refresh tasks after status update
+        await fetchTasks();
       }
     } catch (error) {
       console.error("Error updating task status:", error);
     }
+  };
+
+  const handlePriorityChange = async (taskId, newPriority) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/priority`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ priority: newPriority }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          await fetchTasks();
+        }
+      }
+    } catch (error) {
+      console.error("Error updating priority:", error);
+    }
+  };
+
+  const handleAssignTask = async (taskId, user) => {
+    try {
+      await ref.current.assignTask(taskId, user);
+    } catch (error) {
+      console.error("Error in handleAssignTask:", error);
+    }
+    setIsAssignmentModalOpen(false);
   };
 
   return (
@@ -132,6 +165,7 @@ const Board = forwardRef((props, ref) => {
                     setSelectedTask(task);
                     setIsAssignmentModalOpen(true);
                   }}
+                  onPriorityChange={handlePriorityChange}
                 />
               ))}
             </div>
@@ -143,10 +177,7 @@ const Board = forwardRef((props, ref) => {
         isOpen={isAssignmentModalOpen}
         onClose={() => setIsAssignmentModalOpen(false)}
         task={selectedTask}
-        onAssign={async (taskId, assignee) => {
-          await ref.current.assignTask(taskId, assignee);
-          setIsAssignmentModalOpen(false);
-        }}
+        onAssign={handleAssignTask}
       />
     </>
   );
