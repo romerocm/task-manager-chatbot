@@ -1,6 +1,5 @@
-// src/components/Board/Task.jsx
 import React, { useState } from "react";
-import { UserCircle, ChevronDown } from "lucide-react";
+import { UserCircle, ChevronDown, Trash2 } from "lucide-react";
 import Avatar from "../ui/Avatar";
 
 const PRIORITY_COLORS = {
@@ -19,9 +18,11 @@ const Task = ({
   onDragStart,
   onAssignClick,
   onPriorityChange,
+  onDelete,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleClick = (e) => {
     setIsExpanded(!isExpanded);
@@ -43,16 +44,40 @@ const Task = ({
     setShowPriorityMenu(false);
   };
 
+  const handleDeleteClick = async (e) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this task?")) {
+      setIsDeleting(true);
+      try {
+        await onDelete(id);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, id)}
-      className="bg-white p-3 rounded shadow-sm cursor-move hover:shadow-md transition-shadow relative"
+      className="bg-white p-3 rounded shadow-sm cursor-move hover:shadow-md transition-shadow relative group"
       onClick={handleClick}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <h3 className="font-medium">{title}</h3>
+          <div className="flex justify-between items-start gap-2">
+            <h3 className="font-medium">{title}</h3>
+            <button
+              onClick={handleDeleteClick}
+              disabled={isDeleting}
+              className={`p-1.5 rounded hover:bg-red-100 text-red-500 
+                ${isDeleting ? "opacity-50 cursor-not-allowed" : "opacity-100"}
+                transition-all duration-200`}
+              title="Delete task"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <div className="relative">
               <button
