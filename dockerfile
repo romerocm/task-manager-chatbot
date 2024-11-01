@@ -3,20 +3,23 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Add tini
-RUN apk add --no-cache tini
+# Add necessary tools including PostgreSQL client
+RUN apk add --no-cache tini postgresql-client
 
-# Install dependencies first (better layer caching)
+# Copy package files first for better caching
 COPY package*.json ./
-RUN npm install express dotenv vite-express
 
-# Install all other project dependencies
+# Install ALL dependencies (both production and development)
+RUN npm install pg express dotenv vite-express
 RUN npm install
 
 # Copy project files
 COPY . .
 
-# Ensure the app directory is writable
+# Create migrations directory and ensure it exists
+RUN mkdir -p migrations
+
+# Ensure the app directory and migrations are writable
 RUN chown -R node:node /app
 
 # Switch to non-root user
@@ -26,4 +29,6 @@ EXPOSE 3000
 
 # Use tini as entrypoint
 ENTRYPOINT ["/sbin/tini", "--"]
+
+# Use the start script
 CMD ["npm", "run", "dev"]

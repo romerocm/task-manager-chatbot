@@ -1,11 +1,11 @@
 // server.js
 import express from "express";
 import { config } from "dotenv";
-import { writeFile, readFile, access } from "fs/promises";
-import { constants } from "fs";
+import { writeFile, readFile } from "fs/promises";
 import { join } from "path";
 import ViteExpress from "vite-express";
 import { createServer as createViteServer } from "vite";
+import db from "./src/utils/db.js";
 
 // Initialize environment variables
 config();
@@ -23,58 +23,21 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Function to ensure .env file exists with better error handling
-async function ensureEnvFile() {
-  const envPath = join(process.cwd(), ".env");
+// Function to manage .env file
+const updateEnvFile = async (keys) => {
   try {
-    await access(envPath, constants.F_OK);
-    console.log(".env file exists");
-  } catch {
-    console.log("Creating new .env file");
+    const envPath = join(process.cwd(), ".env");
+    let envContent = "";
+
     try {
-      await writeFile(
-        envPath,
-        "VITE_OPENAI_API_KEY=\nVITE_ANTHROPIC_API_KEY=\n"
-      );
-      console.log(".env file created successfully");
+      envContent = await readFile(envPath, "utf8");
     } catch (error) {
-      console.error("Error creating .env file:", error);
-      throw error;
+      console.log("No existing .env file, creating new one");
     }
-  }
-}
 
-// Function to read current .env content with error handling
-async function readEnvFile() {
-  const envPath = join(process.cwd(), ".env");
-  try {
-    const content = await readFile(envPath, "utf8");
-    console.log("Successfully read .env file");
-    return content;
-  } catch (error) {
-    console.error("Error reading .env file:", error);
-    throw error;
-  }
-}
-
-// Ensure .env file exists when server starts
-ensureEnvFile().catch(console.error);
-
-// Enhanced API key endpoint with better error handling
-app.post("/api/keys", async (req, res) => {
-  try {
-    console.log("Received request to update API keys");
-    const { VITE_OPENAI_API_KEY, VITE_ANTHROPIC_API_KEY } = req.body;
-
-    console.log("Current working directory:", process.cwd());
-    console.log("Writing to .env file...");
-
-    // Read existing .env content
-    let envContent = await readEnvFile();
     const envLines = envContent.split("\n").filter((line) => line.trim());
-
-    // Create a map of existing variables
     const envMap = new Map();
+
     envLines.forEach((line) => {
       const [key, ...valueParts] = line.split("=");
       if (key) {
@@ -82,36 +45,49 @@ app.post("/api/keys", async (req, res) => {
       }
     });
 
-    // Update or add new values
-    if (VITE_OPENAI_API_KEY !== undefined) {
-      envMap.set("VITE_OPENAI_API_KEY", VITE_OPENAI_API_KEY);
+    if (keys.VITE_OPENAI_API_KEY !== undefined) {
+      envMap.set("VITE_OPENAI_API_KEY", keys.VITE_OPENAI_API_KEY);
     }
-    if (VITE_ANTHROPIC_API_KEY !== undefined) {
-      envMap.set("VITE_ANTHROPIC_API_KEY", VITE_ANTHROPIC_API_KEY);
+    if (keys.VITE_ANTHROPIC_API_KEY !== undefined) {
+      envMap.set("VITE_ANTHROPIC_API_KEY", keys.VITE_ANTHROPIC_API_KEY);
     }
 
-    // Convert map back to .env format
     const newEnvContent =
       Array.from(envMap.entries())
         .map(([key, value]) => `${key}=${value}`)
         .join("\n") + "\n";
 
-    // Write to .env file
-    const envPath = join(process.cwd(), ".env");
-    await writeFile(envPath, newEnvContent);
-    console.log("Successfully wrote to .env file");
+    await writeFile(envPath, newEnvContent, "utf8");
+    console.log(".env file updated successfully");
 
-    // Update process.env
-    if (VITE_OPENAI_API_KEY !== undefined) {
-      process.env.VITE_OPENAI_API_KEY = VITE_OPENAI_API_KEY;
-      console.log("Updated OpenAI API key in process.env");
-    }
-    if (VITE_ANTHROPIC_API_KEY !== undefined) {
-      process.env.VITE_ANTHROPIC_API_KEY = VITE_ANTHROPIC_API_KEY;
-      console.log("Updated Anthropic API key in process.env");
-    }
+    Object.entries(keys).forEach(([key, value]) => {
+      if (value !== undefined) {
+        process.env[key] = value;
+      }
+    });
 
-    res.json({ success: true });
+    return true;
+  } catch (error) {
+    console.error("Error updating .env file:", error);
+    throw error;
+  }
+};
+
+// API endpoints for managing API keys
+app.post("/api/keys", async (req, res) => {
+  try {
+    console.log("Received request to update API keys");
+    const { VITE_OPENAI_API_KEY, VITE_ANTHROPIC_API_KEY } = req.body;
+
+    await updateEnvFile({
+      VITE_OPENAI_API_KEY,
+      VITE_ANTHROPIC_API_KEY,
+    });
+
+    res.json({
+      success: true,
+      message: "API keys updated successfully",
+    });
   } catch (error) {
     console.error("Error saving API keys:", error);
     res.status(500).json({
@@ -122,39 +98,8 @@ app.post("/api/keys", async (req, res) => {
   }
 });
 
-// Add test endpoint for API keys
-app.get("/api/keys/test", async (req, res) => {
-  try {
-    console.log("Current API Keys (first few characters):");
-    console.log(
-      "OpenAI:",
-      process.env.VITE_OPENAI_API_KEY
-        ? `${process.env.VITE_OPENAI_API_KEY.slice(0, 3)}...`
-        : "Not set"
-    );
-    console.log(
-      "Anthropic:",
-      process.env.VITE_ANTHROPIC_API_KEY
-        ? `${process.env.VITE_ANTHROPIC_API_KEY.slice(0, 3)}...`
-        : "Not set"
-    );
-
-    res.json({
-      success: true,
-      keysPresent: {
-        openai: !!process.env.VITE_OPENAI_API_KEY,
-        anthropic: !!process.env.VITE_ANTHROPIC_API_KEY,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Updated GET /api/keys endpoint
 app.get("/api/keys", async (req, res) => {
   try {
-    console.log("Fetching current API keys");
     const keys = {
       VITE_OPENAI_API_KEY: process.env.VITE_OPENAI_API_KEY
         ? `${process.env.VITE_OPENAI_API_KEY.slice(
@@ -169,11 +114,264 @@ app.get("/api/keys", async (req, res) => {
           )}...${process.env.VITE_ANTHROPIC_API_KEY.slice(-4)}`
         : "",
     };
-    console.log("API keys fetched successfully");
     res.json({ success: true, keys });
   } catch (error) {
-    console.error("Error fetching API keys:", error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/keys/test", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      keysPresent: {
+        openai: !!process.env.VITE_OPENAI_API_KEY,
+        anthropic: !!process.env.VITE_ANTHROPIC_API_KEY,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// User management endpoints
+app.get("/api/users", async (req, res) => {
+  try {
+    const result = await db.query("SELECT * FROM users ORDER BY name");
+    res.json({ success: true, users: result.rows });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Task management endpoints
+app.get("/api/tasks", async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        t.*,
+        u.name as assignee_name,
+        u.email as assignee_email,
+        u.avatar_url as assignee_avatar
+      FROM tasks t
+      LEFT JOIN users u ON t.assignee_id = u.id
+      ORDER BY t.created_at DESC
+    `);
+    res.json({ success: true, tasks: result.rows });
+  } catch (error) {
+    console.error("Error fetching tasks:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/tasks", async (req, res) => {
+  try {
+    const tasks = Array.isArray(req.body) ? req.body : [req.body];
+
+    const createdTasks = await db.transaction(async (client) => {
+      const results = [];
+      for (const task of tasks) {
+        const {
+          title,
+          description,
+          priority,
+          estimatedTime,
+          status = "todo",
+        } = task;
+        const result = await client.query(
+          `INSERT INTO tasks (title, description, priority, estimated_time, status)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [title, description, priority, estimatedTime, status]
+        );
+        results.push(result.rows[0]);
+      }
+      return results;
+    });
+
+    res.json({ success: true, tasks: createdTasks });
+  } catch (error) {
+    console.error("Error creating tasks:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/tasks/:taskId/assign", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { assigneeId } = req.body;
+
+    const result = await db.query(
+      `UPDATE tasks 
+       SET assignee_id = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [assigneeId, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    // Get the updated task with assignee information
+    const taskWithAssignee = await db.query(
+      `SELECT 
+        t.*,
+        u.name as assignee_name,
+        u.email as assignee_email,
+        u.avatar_url as assignee_avatar
+       FROM tasks t
+       LEFT JOIN users u ON t.assignee_id = u.id
+       WHERE t.id = $1`,
+      [taskId]
+    );
+
+    res.json({ success: true, task: taskWithAssignee.rows[0] });
+  } catch (error) {
+    console.error("Error assigning task:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/tasks/:taskId/status", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { status } = req.body;
+
+    const result = await db.query(
+      "UPDATE tasks SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
+      [status, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    res.json({ success: true, task: result.rows[0] });
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/tasks/:taskId", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    const result = await db.query(
+      "DELETE FROM tasks WHERE id = $1 RETURNING *",
+      [taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Task not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Task deleted successfully",
+      task: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+app.post("/api/tasks/delete", async (req, res) => {
+  try {
+    const { taskIds } = req.body;
+
+    if (!Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid task IDs provided",
+      });
+    }
+
+    const result = await db.query(
+      "DELETE FROM tasks WHERE id = ANY($1) RETURNING *",
+      [taskIds]
+    );
+
+    res.json({
+      success: true,
+      message: `${result.rows.length} tasks deleted successfully`,
+      tasks: result.rows,
+    });
+  } catch (error) {
+    console.error("Error deleting tasks:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+app.put("/api/tasks/:taskId/priority", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { priority } = req.body;
+
+    // Validate priority
+    const validPriorities = ["high", "medium", "low"];
+    if (!validPriorities.includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid priority value",
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE tasks 
+       SET priority = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [priority, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Task not found",
+      });
+    }
+
+    // Get the updated task with assignee information
+    const taskWithAssignee = await db.query(
+      `SELECT 
+        t.*,
+        u.name as assignee_name,
+        u.email as assignee_email,
+        u.avatar_url as assignee_avatar
+       FROM tasks t
+       LEFT JOIN users u ON t.assignee_id = u.id
+       WHERE t.id = $1`,
+      [taskId]
+    );
+
+    res.json({
+      success: true,
+      task: taskWithAssignee.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating task priority:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 
