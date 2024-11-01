@@ -60,25 +60,18 @@ const Task = ({
     <div
       draggable
       onDragStart={(e) => onDragStart(e, id)}
-      className="bg-white p-3 rounded shadow-sm cursor-move hover:shadow-md transition-shadow relative group"
+      className="group bg-white p-3 rounded shadow-sm cursor-move hover:shadow-md transition-shadow relative"
       onClick={handleClick}
     >
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <div className="flex justify-between items-start gap-2">
-            <h3 className="font-medium">{title}</h3>
-            <button
-              onClick={handleDeleteClick}
-              disabled={isDeleting}
-              className={`p-1.5 rounded hover:bg-red-100 text-red-500 
-                ${isDeleting ? "opacity-50 cursor-not-allowed" : "opacity-100"}
-                transition-all duration-200`}
-              title="Delete task"
-            >
-              <Trash2 size={16} />
-            </button>
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex-1 min-w-0">
+          {" "}
+          {/* Added min-w-0 to prevent flex item from expanding */}
+          <div className="flex justify-between items-start mb-1">
+            <h3 className="font-medium pr-6">{title}</h3>{" "}
+            {/* Added right padding for delete button */}
           </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2">
             <div className="relative">
               <button
                 onClick={handlePriorityClick}
@@ -111,17 +104,33 @@ const Task = ({
             )}
           </div>
         </div>
-        <button
-          onClick={handleAssignClick}
-          className="p-1 hover:bg-gray-100 rounded ml-2"
-          title={assignee_name || "Assign task"}
-        >
-          {assignee_name ? (
-            <Avatar name={assignee_name} size={24} />
-          ) : (
-            <UserCircle className="w-6 h-6 text-gray-400" />
-          )}
-        </button>
+
+        <div className="flex items-start gap-2">
+          {" "}
+          {/* Wrapper for delete and avatar buttons */}
+          <button
+            onClick={handleDeleteClick}
+            disabled={isDeleting}
+            className={`p-1.5 rounded hover:bg-red-100 text-red-500 
+              opacity-0 group-hover:opacity-100
+              transition-all duration-200 ease-in-out
+              ${isDeleting ? "cursor-not-allowed" : ""}`}
+            title="Delete task"
+          >
+            <Trash2 size={16} />
+          </button>
+          <button
+            onClick={handleAssignClick}
+            className="p-1 hover:bg-gray-100 rounded"
+            title={assignee_name || "Assign task"}
+          >
+            {assignee_name ? (
+              <Avatar name={assignee_name} size={24} />
+            ) : (
+              <UserCircle className="w-6 h-6 text-gray-400" />
+            )}
+          </button>
+        </div>
       </div>
 
       {isExpanded && description && (
