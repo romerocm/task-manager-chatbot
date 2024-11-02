@@ -1,11 +1,29 @@
-import React, { useState } from "react";
-import { UserCircle, ChevronDown, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  UserCircle,
+  ChevronDown,
+  Trash2,
+  Edit2,
+  X,
+  Check,
+  Keyboard,
+} from "lucide-react";
 import Avatar from "../ui/Avatar";
 
 const PRIORITY_COLORS = {
   high: "bg-red-100 text-red-700 hover:bg-red-200",
   medium: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
   low: "bg-green-100 text-green-700 hover:bg-green-200",
+};
+
+const TOOLTIP_STORAGE_KEY = "task-edit-tooltip-dismissed";
+
+const isMobileDevice = () => {
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || window.matchMedia("(max-width: 768px)").matches
+  );
 };
 
 const Task = ({
@@ -19,13 +37,80 @@ const Task = ({
   onAssignClick,
   onPriorityChange,
   onDelete,
+  onUpdate,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(title);
+  const [editedDescription, setEditedDescription] = useState(description);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const titleInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      titleInputRef.current?.focus();
+
+      // Check if tooltip has been dismissed before
+      if (!isMobileDevice()) {
+        const tooltipDismissed = localStorage.getItem(TOOLTIP_STORAGE_KEY);
+        if (!tooltipDismissed) {
+          setShowTooltip(true);
+        }
+      }
+    }
+  }, [isEditing]);
+
+  const dismissTooltip = () => {
+    setShowTooltip(false);
+    localStorage.setItem(TOOLTIP_STORAGE_KEY, "true");
+  };
 
   const handleClick = (e) => {
-    setIsExpanded(!isExpanded);
+    if (!isEditing) {
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  const handleDoubleClick = (e) => {
+    if (!isEditing) {
+      e.stopPropagation();
+      setIsEditing(true);
+      setIsExpanded(true);
+    }
+  };
+
+  const handleEditClick = (e) => {
+    e.stopPropagation();
+    setIsEditing(true);
+    setIsExpanded(true);
+  };
+
+  const handleCancelEdit = (e) => {
+    e?.stopPropagation();
+    setIsEditing(false);
+    setEditedTitle(title);
+    setEditedDescription(description);
+    setShowTooltip(false);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e?.stopPropagation();
+    if (editedTitle.trim()) {
+      try {
+        const success = await onUpdate(id, {
+          title: editedTitle.trim(),
+          description: editedDescription.trim(),
+        });
+        if (success) {
+          setIsEditing(false);
+          setShowTooltip(false);
+        }
+      } catch (error) {
+        console.error("Error saving task:", error);
+      }
+    }
   };
 
   const handleAssignClick = (e) => {
@@ -56,72 +141,73 @@ const Task = ({
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
+      handleSaveEdit(e);
+    } else if (e.key === "Escape") {
+      handleCancelEdit(e);
+    }
+  };
+
   return (
     <div
-      draggable
+      draggable={!isEditing}
       onDragStart={(e) => onDragStart(e, id)}
-      className="group bg-white p-3 rounded shadow-sm cursor-move hover:shadow-md transition-shadow relative"
+      className={`group bg-white p-3 rounded shadow-sm ${
+        isEditing ? "cursor-default" : "cursor-move"
+      } hover:shadow-md transition-shadow relative`}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
     >
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex-1 min-w-0">
-          {" "}
-          {/* Added min-w-0 to prevent flex item from expanding */}
-          <div className="flex justify-between items-start mb-1">
-            <h3 className="font-medium pr-6">{title}</h3>{" "}
-            {/* Added right padding for delete button */}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <button
-                onClick={handlePriorityClick}
-                className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${PRIORITY_COLORS[priority]}`}
-              >
-                {priority}
-                <ChevronDown size={12} />
-              </button>
-
-              {showPriorityMenu && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border p-1 z-10">
-                  {Object.keys(PRIORITY_COLORS).map((p) => (
-                    <button
-                      key={p}
-                      onClick={handlePrioritySelect(p)}
-                      className={`block w-full text-left px-3 py-1 text-xs rounded ${
-                        p === priority
-                          ? PRIORITY_COLORS[p]
-                          : "hover:bg-gray-100"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              )}
+      {/* Keyboard Shortcuts Tooltip */}
+      {showTooltip && isEditing && (
+        <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded shadow-lg z-20 w-64">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Keyboard size={16} />
+              <span className="text-sm">
+                Press{" "}
+                <kbd className="px-1 py-0.5 bg-gray-700 rounded">
+                  Shift + Enter
+                </kbd>{" "}
+                to save
+              </span>
             </div>
-            {estimatedTime && (
-              <span className="text-xs text-gray-500">{estimatedTime}m</span>
-            )}
+            <button
+              onClick={dismissTooltip}
+              className="text-gray-400 hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+            <div className="w-3 h-3 bg-gray-800 transform rotate-45"></div>
           </div>
         </div>
+      )}
 
-        <div className="flex items-start gap-2">
-          {" "}
-          {/* Wrapper for delete and avatar buttons */}
-          <button
-            onClick={handleDeleteClick}
-            disabled={isDeleting}
-            className={`p-1.5 rounded hover:bg-red-100 text-red-500 
-              opacity-0 group-hover:opacity-100
-              transition-all duration-200 ease-in-out
-              ${isDeleting ? "cursor-not-allowed" : ""}`}
-            title="Delete task"
-          >
-            <Trash2 size={16} />
-          </button>
+      <div className="flex flex-col gap-2">
+        {/* First row: Title with Avatar */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Task title"
+              />
+            ) : (
+              <h3 className="font-medium">{title}</h3>
+            )}
+          </div>
           <button
             onClick={handleAssignClick}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="flex-shrink-0 p-1 hover:bg-gray-100 rounded"
             title={assignee_name || "Assign task"}
           >
             {assignee_name ? (
@@ -131,18 +217,109 @@ const Task = ({
             )}
           </button>
         </div>
-      </div>
 
-      {isExpanded && description && (
-        <div className="mt-2">
-          <p className="text-sm text-gray-600">{description}</p>
-          {assignee_name && (
-            <p className="text-xs text-gray-500 mt-2">
-              Assigned to: {assignee_name}
-            </p>
+        {/* Second row: Priority, Time, and Action Buttons */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={handlePriorityClick}
+              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${PRIORITY_COLORS[priority]}`}
+            >
+              {priority}
+              <ChevronDown size={12} />
+            </button>
+
+            {showPriorityMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border p-1 z-10">
+                {Object.keys(PRIORITY_COLORS).map((p) => (
+                  <button
+                    key={p}
+                    onClick={handlePrioritySelect(p)}
+                    className={`block w-full text-left px-3 py-1 text-xs rounded ${
+                      p === priority ? PRIORITY_COLORS[p] : "hover:bg-gray-100"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {estimatedTime && (
+            <span className="text-xs text-gray-500">{estimatedTime}m</span>
           )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1 ml-auto">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={handleSaveEdit}
+                  className="p-1.5 rounded hover:bg-green-100 text-green-600"
+                  title="Save changes (Shift + Enter)"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
+                  title="Cancel editing (Esc)"
+                >
+                  <X size={16} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleEditClick}
+                  className="p-1.5 rounded hover:bg-blue-100 text-blue-600 
+                  opacity-0 group-hover:opacity-100 
+                  transition-all duration-200 ease-in-out"
+                  title="Edit task"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={handleDeleteClick}
+                  disabled={isDeleting}
+                  className={`p-1.5 rounded hover:bg-red-100 text-red-500 
+                    opacity-0 group-hover:opacity-100
+                    transition-all duration-200 ease-in-out
+                    ${isDeleting ? "cursor-not-allowed" : ""}`}
+                  title="Delete task"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Description Section */}
+        {(isExpanded || isEditing) && (
+          <div className="mt-2">
+            {isEditing ? (
+              <textarea
+                value={editedDescription}
+                onChange={(e) => setEditedDescription(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Task description"
+                rows={3}
+              />
+            ) : (
+              description && (
+                <p className="text-sm text-gray-600">{description}</p>
+              )
+            )}
+            {!isEditing && assignee_name && (
+              <p className="text-xs text-gray-500 mt-2">
+                Assigned to: {assignee_name}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

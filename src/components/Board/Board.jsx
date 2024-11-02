@@ -133,6 +133,38 @@ const Board = forwardRef((props, ref) => {
     }
   };
 
+  const handleTaskUpdate = async (taskId, updates) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update the local state immediately for better UX
+        setColumns((prevColumns) =>
+          prevColumns.map((column) => ({
+            ...column,
+            tasks: column.tasks.map((task) =>
+              task.id === taskId ? { ...task, ...updates, ...data.task } : task
+            ),
+          }))
+        );
+        return true;
+      } else {
+        console.error("Failed to update task:", data.error);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating task:", error);
+      return false;
+    }
+  };
+
   const handleAssignTask = async (taskId, user) => {
     try {
       await ref.current.assignTask(taskId, user);
@@ -142,7 +174,7 @@ const Board = forwardRef((props, ref) => {
     setIsAssignmentModalOpen(false);
   };
 
-  // New function to handle task deletion
+  // Handle task deletion
   const handleDeleteTask = async (taskId) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -199,6 +231,7 @@ const Board = forwardRef((props, ref) => {
                   }}
                   onPriorityChange={handlePriorityChange}
                   onDelete={handleDeleteTask}
+                  onUpdate={handleTaskUpdate}
                 />
               ))}
             </div>
