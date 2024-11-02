@@ -202,6 +202,55 @@ app.post("/api/tasks", async (req, res) => {
   }
 });
 
+// Update task details endpoint
+app.put("/api/tasks/:taskId", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { title, description } = req.body;
+
+    const result = await db.query(
+      `UPDATE tasks 
+       SET title = $1, 
+           description = $2,
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3 
+       RETURNING *`,
+      [title, description, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Task not found",
+      });
+    }
+
+    // Get the updated task with assignee information
+    const taskWithAssignee = await db.query(
+      `SELECT 
+        t.*,
+        u.name as assignee_name,
+        u.email as assignee_email,
+        u.avatar_url as assignee_avatar
+       FROM tasks t
+       LEFT JOIN users u ON t.assignee_id = u.id
+       WHERE t.id = $1`,
+      [taskId]
+    );
+
+    res.json({
+      success: true,
+      task: taskWithAssignee.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 app.put("/api/tasks/:taskId/assign", async (req, res) => {
   try {
     const { taskId } = req.params;
