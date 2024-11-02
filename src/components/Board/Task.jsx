@@ -1,11 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
-import { UserCircle, ChevronDown, Trash2, Edit2, X, Check } from "lucide-react";
+import {
+  UserCircle,
+  ChevronDown,
+  Trash2,
+  Edit2,
+  X,
+  Check,
+  Keyboard,
+} from "lucide-react";
 import Avatar from "../ui/Avatar";
 
 const PRIORITY_COLORS = {
   high: "bg-red-100 text-red-700 hover:bg-red-200",
   medium: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200",
   low: "bg-green-100 text-green-700 hover:bg-green-200",
+};
+
+const TOOLTIP_STORAGE_KEY = "task-edit-tooltip-dismissed";
+
+const isMobileDevice = () => {
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || window.matchMedia("(max-width: 768px)").matches
+  );
 };
 
 const Task = ({
@@ -27,13 +45,27 @@ const Task = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
   const [editedDescription, setEditedDescription] = useState(description);
+  const [showTooltip, setShowTooltip] = useState(false);
   const titleInputRef = useRef(null);
 
   useEffect(() => {
-    if (isEditing && titleInputRef.current) {
-      titleInputRef.current.focus();
+    if (isEditing) {
+      titleInputRef.current?.focus();
+
+      // Check if tooltip has been dismissed before
+      if (!isMobileDevice()) {
+        const tooltipDismissed = localStorage.getItem(TOOLTIP_STORAGE_KEY);
+        if (!tooltipDismissed) {
+          setShowTooltip(true);
+        }
+      }
     }
   }, [isEditing]);
+
+  const dismissTooltip = () => {
+    setShowTooltip(false);
+    localStorage.setItem(TOOLTIP_STORAGE_KEY, "true");
+  };
 
   const handleClick = (e) => {
     if (!isEditing) {
@@ -56,14 +88,15 @@ const Task = ({
   };
 
   const handleCancelEdit = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     setIsEditing(false);
     setEditedTitle(title);
     setEditedDescription(description);
+    setShowTooltip(false);
   };
 
   const handleSaveEdit = async (e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     if (editedTitle.trim()) {
       try {
         const success = await onUpdate(id, {
@@ -72,6 +105,7 @@ const Task = ({
         });
         if (success) {
           setIsEditing(false);
+          setShowTooltip(false);
         }
       } catch (error) {
         console.error("Error saving task:", error);
@@ -108,7 +142,8 @@ const Task = ({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && e.ctrlKey) {
+    if (e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
       handleSaveEdit(e);
     } else if (e.key === "Escape") {
       handleCancelEdit(e);
@@ -125,6 +160,33 @@ const Task = ({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
     >
+      {/* Keyboard Shortcuts Tooltip */}
+      {showTooltip && isEditing && (
+        <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded shadow-lg z-20 w-64">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Keyboard size={16} />
+              <span className="text-sm">
+                Press{" "}
+                <kbd className="px-1 py-0.5 bg-gray-700 rounded">
+                  Shift + Enter
+                </kbd>{" "}
+                to save
+              </span>
+            </div>
+            <button
+              onClick={dismissTooltip}
+              className="text-gray-400 hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+            <div className="w-3 h-3 bg-gray-800 transform rotate-45"></div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {/* First row: Title with Avatar */}
         <div className="flex items-start justify-between gap-2">
@@ -194,14 +256,14 @@ const Task = ({
                 <button
                   onClick={handleSaveEdit}
                   className="p-1.5 rounded hover:bg-green-100 text-green-600"
-                  title="Save changes"
+                  title="Save changes (Shift + Enter)"
                 >
                   <Check size={16} />
                 </button>
                 <button
                   onClick={handleCancelEdit}
                   className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
-                  title="Cancel editing"
+                  title="Cancel editing (Esc)"
                 >
                   <X size={16} />
                 </button>
