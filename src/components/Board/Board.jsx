@@ -51,7 +51,7 @@ const Board = forwardRef((props, ref) => {
     }, {});
   };
 
-  // New function to update task positions
+  // Updated updateTaskPositions function
   const updateTaskPositions = async (columnId, tasks) => {
     try {
       const positions = tasks.map((task, index) => ({
@@ -75,6 +75,7 @@ const Board = forwardRef((props, ref) => {
       }
     } catch (error) {
       console.error("Error updating task positions:", error);
+      await fetchTasks();
     }
   };
 
@@ -124,6 +125,7 @@ const Board = forwardRef((props, ref) => {
 
   const handleDragOver = (e, taskId) => {
     e.preventDefault();
+    e.stopPropagation();
     if (taskId === draggedTask) return;
 
     const taskElement = e.currentTarget;
@@ -158,7 +160,8 @@ const Board = forwardRef((props, ref) => {
     setDragPosition(null);
   };
 
-  const handleDrop = async (e, targetColumnId, targetTaskId = null) => {
+  // Updated handleDrop function
+  const handleDrop = async (e, targetColumnId) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -183,24 +186,21 @@ const Board = forwardRef((props, ref) => {
       // Get the dragged task and remove it from the array
       const [draggedTask] = tasks.splice(draggedTaskIndex, 1);
 
+      // Determine insert position
+      let insertIndex;
       if (!dragOverTask || dragOverTask.startsWith("column-end-")) {
         // If dropping at the end of a column
-        tasks.push(draggedTask);
+        insertIndex = tasks.length;
       } else {
-        // Get the actual target task index based on the dragOverTask ID
+        // Find the target task index
         const targetIndex = tasks.findIndex(
           (t) => t.id === parseInt(dragOverTask)
         );
-        if (targetIndex > -1) {
-          // Insert based on drop position (before or after target)
-          const insertIndex =
-            dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
-          tasks.splice(insertIndex, 0, draggedTask);
-        } else {
-          // Fallback: add to end if target not found
-          tasks.push(draggedTask);
-        }
+        insertIndex = dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
       }
+
+      // Insert the task at the new position
+      tasks.splice(insertIndex, 0, draggedTask);
 
       // Update local state immediately for better UX
       setColumns(
@@ -209,52 +209,73 @@ const Board = forwardRef((props, ref) => {
         )
       );
 
-      // Persist the new order to the database
+      // Persist the new order
       await updateTaskPositions(targetColumnId, tasks);
     } else {
-      // If dropping between columns
+      // Moving task between columns
       try {
         const targetTasks = [...targetColumn.tasks];
-        let newPosition = targetTasks.length; // Default to end of list
+        let insertIndex;
 
-        if (dragOverTask && !dragOverTask.startsWith("column-end-")) {
+        // Calculate the insert position
+        if (!dragOverTask || dragOverTask.startsWith("column-end-")) {
+          insertIndex = targetTasks.length;
+        } else {
           const targetIndex = targetTasks.findIndex(
             (t) => t.id === parseInt(dragOverTask)
           );
-          if (targetIndex > -1) {
-            newPosition =
-              dragPosition === "top" ? targetIndex : targetIndex + 1;
-          }
+          insertIndex =
+            dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
         }
 
-        // Update task status and position
+        const draggedTask = sourceColumn.tasks.find(
+          (t) => t.id === parseInt(taskId)
+        );
+
+        if (!draggedTask) return;
+
+        // Update the task's status and position
         const response = await fetch(`/api/tasks/${taskId}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             status: targetColumnId,
-            position: newPosition,
+            position: insertIndex,
           }),
         });
 
         if (response.ok) {
-          // Update both columns' positions
+          // Remove task from source column
           const updatedSourceTasks = sourceColumn.tasks.filter(
             (t) => t.id !== parseInt(taskId)
           );
-          await updateTaskPositions(sourceColumnId, updatedSourceTasks);
 
-          const updatedTargetTasks = [...targetColumn.tasks];
-          const dragged = sourceColumn.tasks.find(
-            (t) => t.id === parseInt(taskId)
+          // Add task to target column
+          const updatedTargetTasks = [...targetTasks];
+          updatedTargetTasks.splice(insertIndex, 0, draggedTask);
+
+          // Update both columns' positions
+          await Promise.all([
+            updateTaskPositions(sourceColumnId, updatedSourceTasks),
+            updateTaskPositions(targetColumnId, updatedTargetTasks),
+          ]);
+
+          // Update local state
+          setColumns((prevColumns) =>
+            prevColumns.map((col) => {
+              if (col.id === sourceColumnId) {
+                return { ...col, tasks: updatedSourceTasks };
+              }
+              if (col.id === targetColumnId) {
+                return { ...col, tasks: updatedTargetTasks };
+              }
+              return col;
+            })
           );
-          updatedTargetTasks.splice(newPosition, 0, dragged);
-          await updateTaskPositions(targetColumnId, updatedTargetTasks);
-
-          await fetchTasks();
         }
       } catch (error) {
-        console.error("Error updating task status:", error);
+        console.error("Error moving task between columns:", error);
+        await fetchTasks(); // Revert to original state if there's an error
       }
     }
 
@@ -397,18 +418,23 @@ const Board = forwardRef((props, ref) => {
             key={column.id}
             className="w-80 bg-gray-50 rounded-lg p-4"
             onDragOver={(e) => handleColumnDragOver(e, column.id)}
+            onDrop={(e) => handleDrop(e, column.id)}
             onDragLeave={handleDragLeave}
           >
             <h2 className="font-semibold mb-4 text-gray-700">
               {column.title} ({column.tasks.length})
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-2 min-h-[50px]">
               {column.tasks.map((task) => (
                 <div
                   key={task.id}
                   className={`relative transition-transform duration-200 ease-in-out mb-2`}
                   onDragOver={(e) => handleDragOver(e, task.id)}
-                  onDrop={(e) => handleDrop(e, column.id, task.id)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDrop(e, column.id);
+                  }}
                   onDragLeave={handleDragLeave}
                 >
                   {dragOverTask === task.id && dragPosition === "top" && (
@@ -441,7 +467,15 @@ const Board = forwardRef((props, ref) => {
               {dragOverTask === `column-end-${column.id}` && (
                 <div
                   className="h-20 border-2 border-blue-500 border-dashed rounded-lg bg-blue-50 transition-all duration-200"
-                  onDrop={(e) => handleDrop(e, column.id)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDrop(e, column.id);
+                  }}
                 />
               )}
             </div>

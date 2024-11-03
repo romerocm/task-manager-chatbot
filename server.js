@@ -240,30 +240,47 @@ app.put("/api/tasks/positions", async (req, res) => {
   }
 });
 
+// Update the status change endpoint to handle positions
 app.put("/api/tasks/:taskId/status", async (req, res) => {
   try {
     const { taskId } = req.params;
     const { status, position } = req.body;
 
-    const result = await db.query(
-      `UPDATE tasks 
-       SET status = $1,
-           position = COALESCE($2, (
-             SELECT COALESCE(MAX(position) + 1, 0)
-             FROM tasks 
-             WHERE status = $1
-           )),
-           updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $3 
-       RETURNING *`,
-      [status, position, taskId]
-    );
+    const result = await db.transaction(async (client) => {
+      // First, get the task's current status and position
+      const currentTask = await client.query(
+        "SELECT status FROM tasks WHERE id = $1",
+        [taskId]
+      );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: "Task not found" });
-    }
+      if (currentTask.rows.length === 0) {
+        throw new Error("Task not found");
+      }
 
-    res.json({ success: true, task: result.rows[0] });
+      // Get max position in target status
+      const maxPosResult = await client.query(
+        `SELECT COALESCE(MAX(position) + 1, 0) as next_pos 
+         FROM tasks 
+         WHERE status = $1`,
+        [status]
+      );
+      const newPosition = position ?? maxPosResult.rows[0].next_pos;
+
+      // Update the task
+      const updatedTask = await client.query(
+        `UPDATE tasks 
+         SET status = $1, 
+             position = $2,
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $3 
+         RETURNING *`,
+        [status, newPosition, taskId]
+      );
+
+      return updatedTask.rows[0];
+    });
+
+    res.json({ success: true, task: result });
   } catch (error) {
     console.error("Error updating task status:", error);
     res.status(500).json({ success: false, error: error.message });
