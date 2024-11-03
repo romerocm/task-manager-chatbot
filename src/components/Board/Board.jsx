@@ -51,6 +51,33 @@ const Board = forwardRef((props, ref) => {
     }, {});
   };
 
+  // New function to update task positions
+  const updateTaskPositions = async (columnId, tasks) => {
+    try {
+      const positions = tasks.map((task, index) => ({
+        id: task.id,
+        position: index,
+      }));
+
+      const response = await fetch("/api/tasks/positions", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: columnId,
+          positions: positions,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update task positions");
+      }
+    } catch (error) {
+      console.error("Error updating task positions:", error);
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     fetchTasks,
     addTasks: async (newTasks) => {
@@ -156,50 +183,74 @@ const Board = forwardRef((props, ref) => {
       // Get the dragged task and remove it from the array
       const [draggedTask] = tasks.splice(draggedTaskIndex, 1);
 
-      if (dragOverTask?.startsWith("column-end-")) {
+      if (!dragOverTask || dragOverTask.startsWith("column-end-")) {
         // If dropping at the end of a column
         tasks.push(draggedTask);
       } else {
-        // Find the target task index
-        const targetTaskIndex = tasks.findIndex(
+        // Get the actual target task index based on the dragOverTask ID
+        const targetIndex = tasks.findIndex(
           (t) => t.id === parseInt(dragOverTask)
         );
-
-        if (targetTaskIndex === -1) {
-          // If no specific target, add to the end
-          tasks.push(draggedTask);
-        } else {
-          // Insert at the correct position based on drop position
-          let insertIndex = targetTaskIndex;
-          if (dragPosition === "bottom") {
-            insertIndex += 1;
-          }
-
-          // Adjust insert index if we're moving a task to a later position
-          if (draggedTaskIndex < targetTaskIndex) {
-            insertIndex -= 1;
-          }
-
+        if (targetIndex > -1) {
+          // Insert based on drop position (before or after target)
+          const insertIndex =
+            dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
           tasks.splice(insertIndex, 0, draggedTask);
+        } else {
+          // Fallback: add to end if target not found
+          tasks.push(draggedTask);
         }
       }
 
-      // Update the columns state
+      // Update local state immediately for better UX
       setColumns(
         columns.map((col) =>
           col.id === sourceColumnId ? { ...col, tasks } : col
         )
       );
+
+      // Persist the new order to the database
+      await updateTaskPositions(targetColumnId, tasks);
     } else {
-      // If dropping between columns, update the task status
+      // If dropping between columns
       try {
+        const targetTasks = [...targetColumn.tasks];
+        let newPosition = targetTasks.length; // Default to end of list
+
+        if (dragOverTask && !dragOverTask.startsWith("column-end-")) {
+          const targetIndex = targetTasks.findIndex(
+            (t) => t.id === parseInt(dragOverTask)
+          );
+          if (targetIndex > -1) {
+            newPosition =
+              dragPosition === "top" ? targetIndex : targetIndex + 1;
+          }
+        }
+
+        // Update task status and position
         const response = await fetch(`/api/tasks/${taskId}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: targetColumnId }),
+          body: JSON.stringify({
+            status: targetColumnId,
+            position: newPosition,
+          }),
         });
 
         if (response.ok) {
+          // Update both columns' positions
+          const updatedSourceTasks = sourceColumn.tasks.filter(
+            (t) => t.id !== parseInt(taskId)
+          );
+          await updateTaskPositions(sourceColumnId, updatedSourceTasks);
+
+          const updatedTargetTasks = [...targetColumn.tasks];
+          const dragged = sourceColumn.tasks.find(
+            (t) => t.id === parseInt(taskId)
+          );
+          updatedTargetTasks.splice(newPosition, 0, dragged);
+          await updateTaskPositions(targetColumnId, updatedTargetTasks);
+
           await fetchTasks();
         }
       } catch (error) {
@@ -307,6 +358,20 @@ const Board = forwardRef((props, ref) => {
 
       const data = await response.json();
       if (data.success) {
+        // Find the column containing the deleted task
+        const columnWithTask = columns.find((col) =>
+          col.tasks.some((task) => task.id === taskId)
+        );
+
+        if (columnWithTask) {
+          // Get remaining tasks in the column
+          const remainingTasks = columnWithTask.tasks.filter(
+            (task) => task.id !== taskId
+          );
+          // Update positions for remaining tasks
+          await updateTaskPositions(columnWithTask.id, remainingTasks);
+        }
+
         setColumns((prevColumns) =>
           prevColumns.map((column) => ({
             ...column,
