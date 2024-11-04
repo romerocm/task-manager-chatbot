@@ -383,7 +383,7 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
       throw new Error(result?.error || "Failed to delete tasks");
     }
 
-    const deletedCount = result.tasks?.length || 0;
+    const deletedCount = tasksToDelete.length;
 
     return {
       success: true,
