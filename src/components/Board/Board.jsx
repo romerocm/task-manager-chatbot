@@ -32,6 +32,16 @@ const Board = forwardRef((props, ref) => {
           }))
         );
       }
+      // Ensure the first card in each column is always on top
+      setColumns((prevColumns) =>
+        prevColumns.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((task, index) => ({
+            ...task,
+            zIndex: index === 0 ? 10 : 1,
+          })),
+        }))
+      );
     } catch (error) {
       console.error("Error fetching tasks:", error);
     }
