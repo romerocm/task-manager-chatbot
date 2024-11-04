@@ -292,7 +292,7 @@ const Task = ({
             </button>
 
             {showPriorityMenu && (
-              <div ref={dropdownRef} className="fixed bg-white rounded-lg shadow-lg border p-1 z-50" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+              <div ref={dropdownRef} className="absolute bg-white rounded-lg shadow-lg border p-1 z-50 mt-1">
                 {Object.keys(PRIORITY_COLORS).map((p) => (
                   <button
                     key={p}
