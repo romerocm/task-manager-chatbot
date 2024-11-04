@@ -229,7 +229,7 @@ const Board = forwardRef((props, ref) => {
 
         // Determine target insert position
         let insertIndex;
-        if (!dragOverTask || dragOverTask.startsWith("column-end-")) {
+        if (!dragOverTask || (typeof dragOverTask === "string" && dragOverTask.startsWith("column-end-"))) {
           insertIndex = targetTasks.length;
         } else {
           const targetIndex = targetTasks.findIndex(
