@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   UserCircle,
   ChevronDown,
@@ -157,9 +157,29 @@ const Task = ({
     onAssignClick(id);
   };
 
+  const dropdownRef = useRef(null);
+
+  const handleClickOutside = useCallback((event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      setShowPriorityMenu(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPriorityMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showPriorityMenu, handleClickOutside]);
+
   const handlePriorityClick = (e) => {
     e.stopPropagation();
-    setShowPriorityMenu(!showPriorityMenu);
+    setShowPriorityMenu((prev) => !prev);
   };
 
   const handlePrioritySelect = (newPriority) => (e) => {
@@ -265,14 +285,14 @@ const Task = ({
           <div className="relative">
             <button
               onClick={handlePriorityClick}
-              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${PRIORITY_COLORS[priority]}`}
+              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${PRIORITY_COLORS[priority]} z-50 relative`}
             >
               {priority}
               <ChevronDown size={12} />
             </button>
 
             {showPriorityMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border p-1 z-10">
+              <div ref={dropdownRef} className="absolute bg-white rounded-lg shadow-lg border p-1 z-50 mt-1" style={{ zIndex: 2000 }}>
                 {Object.keys(PRIORITY_COLORS).map((p) => (
                   <button
                     key={p}

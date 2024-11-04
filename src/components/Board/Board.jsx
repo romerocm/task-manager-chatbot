@@ -32,6 +32,16 @@ const Board = forwardRef((props, ref) => {
           }))
         );
       }
+      // Ensure each card in a column is stacked above the one below it
+      setColumns((prevColumns) =>
+        prevColumns.map((col) => ({
+          ...col,
+          tasks: col.tasks.map((task, index) => ({
+            ...task,
+            zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
+          })),
+        }))
+      );
     } catch (error) {
       console.error("Error fetching tasks:", error);
     }
@@ -434,10 +444,11 @@ const Board = forwardRef((props, ref) => {
               {column.title} ({column.tasks.length})
             </h2>
             <div className="space-y-2 min-h-[50px]">
-              {column.tasks.map((task) => (
+              {column.tasks.map((task, index) => (
                 <div
                   key={task.id}
                   className={`relative transition-transform duration-200 ease-in-out mb-2`}
+                  style={{ zIndex: column.tasks.length - index }}
                   onDragOver={(e) => handleDragOver(e, task.id)}
                   onDrop={(e) => {
                     e.preventDefault();
