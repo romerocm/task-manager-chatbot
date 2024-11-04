@@ -16,6 +16,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [lastDeletedTasks, setLastDeletedTasks] = useState([]);
   const messagesEndRef = useRef(null);
 
   // Check API configuration on component mount
@@ -63,6 +64,9 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "delete last",
       "remove last",
       "clear last",
+      "undo",
+      "revert",
+      "restore",
     ];
 
     return assignmentKeywords.some((keyword) =>
@@ -110,6 +114,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       if (isDeletionRequest) {
         console.log("Processing deletion request:", input);
         const result = await processTaskDeletions(input);
+        setLastDeletedTasks(result.data?.deletedTasks || []);
 
         if (!result || !result.success) {
           throw new Error(result?.error || "Failed to process deletions");
@@ -150,6 +155,49 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
 
         if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
+        }
+      } else if (input.toLowerCase().includes("undo")) {
+        if (lastDeletedTasks.length > 0) {
+          console.log("Restoring last deleted tasks");
+          const response = await fetch("/api/tasks/restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tasks: lastDeletedTasks }),
+          });
+
+          const result = await response.json();
+          if (!result || !result.success) {
+            throw new Error(result?.error || "Failed to restore tasks");
+          }
+
+          const restoreMessage = {
+            id: Date.now() + 1,
+            text: `Restored ${lastDeletedTasks.length} task${
+              lastDeletedTasks.length !== 1 ? "s" : ""
+            } successfully.`,
+            sender: "ai",
+          };
+          setMessages((prev) => {
+            const updatedMessages = [...prev, restoreMessage];
+            localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+            return updatedMessages;
+          });
+
+          if (boardRef.current?.fetchTasks) {
+            await boardRef.current.fetchTasks();
+          }
+          setLastDeletedTasks([]);
+        } else {
+          const noTasksMessage = {
+            id: Date.now() + 1,
+            text: "No tasks to restore.",
+            sender: "ai",
+          };
+          setMessages((prev) => {
+            const updatedMessages = [...prev, noTasksMessage];
+            localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+            return updatedMessages;
+          });
         }
       } else {
         // Handle regular task generation
