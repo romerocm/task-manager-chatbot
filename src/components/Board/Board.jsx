@@ -36,6 +36,7 @@ const Board = forwardRef((props, ref) => {
             ...col,
             tasks: organizedTasks[col.id] || [],
           }));
+        );
         if (data.tasks.length > 0) {
           localStorage.setItem("tasksAdded", "true");
           setIsFreshBoard(false);
