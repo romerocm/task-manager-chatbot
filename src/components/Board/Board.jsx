@@ -32,13 +32,13 @@ const Board = forwardRef((props, ref) => {
           }))
         );
       }
-      // Ensure the first card in each column is always on top
+      // Ensure each card in a column is stacked above the one below it
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
           ...col,
           tasks: col.tasks.map((task, index) => ({
             ...task,
-            zIndex: index === 0 ? 10 : 1,
+            zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
           })),
         }))
       );
