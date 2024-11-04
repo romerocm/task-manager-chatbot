@@ -287,6 +287,30 @@ app.put("/api/tasks/:taskId/status", async (req, res) => {
   }
 });
 
+app.put("/api/tasks/:taskId/priority", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { priority } = req.body;
+
+    const result = await db.query(
+      `UPDATE tasks 
+       SET priority = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [priority, taskId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Task not found" });
+    }
+
+    res.json({ success: true, task: result.rows[0] });
+  } catch (error) {
+    console.error("Error updating task priority:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.put("/api/tasks/:taskId/assign", async (req, res) => {
   try {
     const { taskId } = req.params;
