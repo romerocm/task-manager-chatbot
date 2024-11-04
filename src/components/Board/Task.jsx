@@ -264,7 +264,9 @@ const Task = ({
                 placeholder="Task title"
               />
             ) : (
-              <h3 className="font-medium">{title}</h3>
+              <h3 className="font-medium" onDoubleClick={handleDoubleClick}>
+                {title}
+              </h3>
             )}
           </div>
           <button
