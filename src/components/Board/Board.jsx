@@ -447,7 +447,8 @@ const Board = forwardRef((props, ref) => {
               {column.tasks.map((task, index) => (
                 <div
                   key={task.id}
-                  className={`relative transition-transform duration-200 ease-in-out mb-2 ${index === 0 ? 'z-10' : ''}`}
+                  className={`relative transition-transform duration-200 ease-in-out mb-2`}
+                  style={{ zIndex: column.tasks.length - index }}
                   onDragOver={(e) => handleDragOver(e, task.id)}
                   onDrop={(e) => {
                     e.preventDefault();
