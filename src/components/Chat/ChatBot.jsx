@@ -156,12 +156,12 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           throw new Error(result.error || "Failed to generate tasks");
         }
 
-        const tasks = result.data.map(task => {
+        const tasks = await Promise.all(result.data.map(async task => {
           if (task.assigneeName) {
             task.assignee = await findUserByName(task.assigneeName);
           }
           return task;
-        });
+        }));
         const aiMessage = {
           id: Date.now() + 1,
           text: `I've created ${
