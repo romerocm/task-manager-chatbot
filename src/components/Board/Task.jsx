@@ -40,6 +40,7 @@ const Task = ({
   onDelete,
   onUpdate,
   className,
+  isTopCard,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
@@ -223,7 +224,7 @@ const Task = ({
       onDoubleClick={handleDoubleClick}
     >
       {/* Keyboard Shortcuts Tooltip */}
-      {showTooltip && isEditing && (
+      {showTooltip && isEditing && isTopCard && (
         <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded shadow-lg z-20 w-64">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
