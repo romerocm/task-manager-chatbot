@@ -323,6 +323,12 @@ const Board = forwardRef((props, ref) => {
         body: JSON.stringify(updates),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Failed to update task:", errorText);
+        return false;
+      }
+
       const data = await response.json();
       if (data.success) {
         setColumns((prevColumns) =>
