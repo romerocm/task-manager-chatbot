@@ -35,22 +35,22 @@ const Board = forwardRef((props, ref) => {
           columns.map((col) => ({
             ...col,
             tasks: organizedTasks[col.id] || [],
-          }))
-        );
+          }));
         if (data.tasks.length > 0) {
           localStorage.setItem("tasksAdded", "true");
           setIsFreshBoard(false);
         }
-      // Ensure each card in a column is stacked above the one below it
-      setColumns((prevColumns) =>
-        prevColumns.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((task, index) => ({
-            ...task,
-            zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
-          })),
-        }))
-      );
+        // Ensure each card in a column is stacked above the one below it
+        setColumns((prevColumns) =>
+          prevColumns.map((col) => ({
+            ...col,
+            tasks: col.tasks.map((task, index) => ({
+              ...task,
+              zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
+            })),
+          }))
+        );
+      }
     } catch (error) {
       console.error("Error fetching tasks:", error);
     }
