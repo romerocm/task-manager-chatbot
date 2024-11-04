@@ -84,15 +84,21 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "get rid of",
     ];
 
-    const columnKeywords = ["in progress", "to do", "done"];
+    const columnKeywords = {
+      "in progress": "inProgress",
+      "to do": "todo",
+      "done": "done",
+    };
 
     const isDeletion = deletionKeywords.some((keyword) =>
       input.toLowerCase().includes(keyword.toLowerCase())
     );
 
-    const column = columnKeywords.find((col) =>
+    const column = Object.keys(columnKeywords).find((col) =>
       input.toLowerCase().includes(col)
     );
+
+    return { isDeletion, column: column ? columnKeywords[column] : null };
 
     return { isDeletion, column };
   };
