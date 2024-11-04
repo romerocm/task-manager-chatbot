@@ -1,7 +1,7 @@
 // src/components/Chat/ChatBot.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Send, Trash2 } from "lucide-react";
-import {
+import { findUserByName,
   generateTasks,
   processTaskAssignments,
   processTaskDeletions,
