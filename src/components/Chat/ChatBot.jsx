@@ -68,6 +68,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "undo",
       "revert",
       "restore",
+      "set",
     ];
 
     return assignmentKeywords.some((keyword) =>
