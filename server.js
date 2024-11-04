@@ -161,7 +161,7 @@ app.get("/api/tasks", async (req, res) => {
         u.avatar_url as assignee_avatar
       FROM tasks t
       LEFT JOIN users u ON t.assignee_id = u.id
-      ORDER BY t.created_at DESC
+      ORDER BY t.status, t.position, t.created_at DESC
     `);
     res.json({ success: true, tasks: result.rows });
   } catch (error) {
@@ -177,6 +177,15 @@ app.post("/api/tasks", async (req, res) => {
     const createdTasks = await db.transaction(async (client) => {
       const results = [];
       for (const task of tasks) {
+        // Get max position for the status
+        const posResult = await client.query(
+          `SELECT COALESCE(MAX(position) + 1, 0) as next_pos 
+           FROM tasks 
+           WHERE status = $1`,
+          [task.status || "todo"]
+        );
+        const position = posResult.rows[0].next_pos;
+
         const {
           title,
           description,
@@ -184,11 +193,12 @@ app.post("/api/tasks", async (req, res) => {
           estimatedTime,
           status = "todo",
         } = task;
+
         const result = await client.query(
-          `INSERT INTO tasks (title, description, priority, estimated_time, status)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO tasks (title, description, priority, estimated_time, status, position)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
-          [title, description, priority, estimatedTime, status]
+          [title, description, priority, estimatedTime, status, position]
         );
         results.push(result.rows[0]);
       }
@@ -202,52 +212,78 @@ app.post("/api/tasks", async (req, res) => {
   }
 });
 
-// Update task details endpoint
-app.put("/api/tasks/:taskId", async (req, res) => {
+// New endpoint to update task positions
+app.put("/api/tasks/positions", async (req, res) => {
   try {
-    const { taskId } = req.params;
-    const { title, description } = req.body;
+    const { status, positions } = req.body;
 
-    const result = await db.query(
-      `UPDATE tasks 
-       SET title = $1, 
-           description = $2,
-           updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $3 
-       RETURNING *`,
-      [title, description, taskId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Task not found",
-      });
-    }
-
-    // Get the updated task with assignee information
-    const taskWithAssignee = await db.query(
-      `SELECT 
-        t.*,
-        u.name as assignee_name,
-        u.email as assignee_email,
-        u.avatar_url as assignee_avatar
-       FROM tasks t
-       LEFT JOIN users u ON t.assignee_id = u.id
-       WHERE t.id = $1`,
-      [taskId]
-    );
-
-    res.json({
-      success: true,
-      task: taskWithAssignee.rows[0],
+    await db.transaction(async (client) => {
+      // Update each task's position
+      for (const { id, position } of positions) {
+        await client.query(
+          `UPDATE tasks 
+           SET position = $1, 
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND status = $3`,
+          [position, id, status]
+        );
+      }
     });
+
+    res.json({ success: true });
   } catch (error) {
-    console.error("Error updating task:", error);
+    console.error("Error updating task positions:", error);
     res.status(500).json({
       success: false,
       error: error.message,
     });
+  }
+});
+
+// Update the status change endpoint to handle positions
+app.put("/api/tasks/:taskId/status", async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { status, position } = req.body;
+
+    const result = await db.transaction(async (client) => {
+      // First, get the task's current status and position
+      const currentTask = await client.query(
+        "SELECT status FROM tasks WHERE id = $1",
+        [taskId]
+      );
+
+      if (currentTask.rows.length === 0) {
+        throw new Error("Task not found");
+      }
+
+      // Get max position in target status
+      const maxPosResult = await client.query(
+        `SELECT COALESCE(MAX(position) + 1, 0) as next_pos 
+         FROM tasks 
+         WHERE status = $1`,
+        [status]
+      );
+      const newPosition = position ?? maxPosResult.rows[0].next_pos;
+
+      // Update the task
+      const updatedTask = await client.query(
+        `UPDATE tasks 
+         SET status = $1, 
+             position = $2,
+             updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $3 
+         RETURNING *`,
+        [status, newPosition, taskId]
+      );
+
+      return updatedTask.rows[0];
+    });
+
+    res.json({ success: true, task: result });
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -288,47 +324,50 @@ app.put("/api/tasks/:taskId/assign", async (req, res) => {
   }
 });
 
-app.put("/api/tasks/:taskId/status", async (req, res) => {
-  try {
-    const { taskId } = req.params;
-    const { status } = req.body;
-
-    const result = await db.query(
-      "UPDATE tasks SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
-      [status, taskId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: "Task not found" });
-    }
-
-    res.json({ success: true, task: result.rows[0] });
-  } catch (error) {
-    console.error("Error updating task status:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 app.delete("/api/tasks/:taskId", async (req, res) => {
   try {
     const { taskId } = req.params;
 
-    const result = await db.query(
-      "DELETE FROM tasks WHERE id = $1 RETURNING *",
+    // First, get the task to know its status and position
+    const taskResult = await db.query(
+      "SELECT status, position FROM tasks WHERE id = $1",
       [taskId]
     );
 
-    if (result.rows.length === 0) {
+    if (taskResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: "Task not found",
       });
     }
 
+    const { status, position } = taskResult.rows[0];
+
+    await db.transaction(async (client) => {
+      // Delete the task
+      const result = await client.query(
+        "DELETE FROM tasks WHERE id = $1 RETURNING *",
+        [taskId]
+      );
+
+      // Update positions of remaining tasks
+      await client.query(
+        `UPDATE tasks 
+         SET position = position - 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE status = $1 
+         AND position > $2`,
+        [status, position]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error("Task not found");
+      }
+    });
+
     res.json({
       success: true,
       message: "Task deleted successfully",
-      task: result.rows[0],
     });
   } catch (error) {
     console.error("Error deleting task:", error);
@@ -350,15 +389,44 @@ app.post("/api/tasks/delete", async (req, res) => {
       });
     }
 
-    const result = await db.query(
-      "DELETE FROM tasks WHERE id = ANY($1) RETURNING *",
-      [taskIds]
-    );
+    await db.transaction(async (client) => {
+      // Get tasks to be deleted with their positions
+      const tasksToDelete = await client.query(
+        "SELECT id, status, position FROM tasks WHERE id = ANY($1)",
+        [taskIds]
+      );
+
+      // Delete tasks
+      await client.query("DELETE FROM tasks WHERE id = ANY($1)", [taskIds]);
+
+      // Update positions for each status group
+      const statusGroups = {};
+      tasksToDelete.rows.forEach((task) => {
+        if (!statusGroups[task.status]) {
+          statusGroups[task.status] = new Set();
+        }
+        statusGroups[task.status].add(task.position);
+      });
+
+      // Update positions for remaining tasks in each affected status
+      for (const [status, positions] of Object.entries(statusGroups)) {
+        const posArray = Array.from(positions).sort((a, b) => a - b);
+        for (let i = 0; i < posArray.length; i++) {
+          await client.query(
+            `UPDATE tasks 
+             SET position = position - 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE status = $1 
+             AND position > $2`,
+            [status, posArray[i] - i]
+          );
+        }
+      }
+    });
 
     res.json({
       success: true,
-      message: `${result.rows.length} tasks deleted successfully`,
-      tasks: result.rows,
+      message: `Tasks deleted successfully`,
     });
   } catch (error) {
     console.error("Error deleting tasks:", error);
@@ -369,58 +437,30 @@ app.post("/api/tasks/delete", async (req, res) => {
   }
 });
 
-app.put("/api/tasks/:taskId/priority", async (req, res) => {
+app.put("/api/tasks/:taskId", async (req, res) => {
   try {
     const { taskId } = req.params;
-    const { priority } = req.body;
+    const updates = req.body;
 
-    // Validate priority
-    const validPriorities = ["high", "medium", "low"];
-    if (!validPriorities.includes(priority)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid priority value",
-      });
-    }
+    console.log(`Received update request for task ID: ${taskId}`, updates);
 
     const result = await db.query(
       `UPDATE tasks 
-       SET priority = $1, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $2 
+       SET title = $1, description = $2, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3 
        RETURNING *`,
-      [priority, taskId]
+      [updates.title, updates.description, taskId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Task not found",
-      });
+      console.warn(`Task with ID ${taskId} not found`);
+      return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    // Get the updated task with assignee information
-    const taskWithAssignee = await db.query(
-      `SELECT 
-        t.*,
-        u.name as assignee_name,
-        u.email as assignee_email,
-        u.avatar_url as assignee_avatar
-       FROM tasks t
-       LEFT JOIN users u ON t.assignee_id = u.id
-       WHERE t.id = $1`,
-      [taskId]
-    );
-
-    res.json({
-      success: true,
-      task: taskWithAssignee.rows[0],
-    });
+    res.json({ success: true, task: result.rows[0] });
   } catch (error) {
-    console.error("Error updating task priority:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    console.error("Error updating task:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

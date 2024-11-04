@@ -34,10 +34,12 @@ const Task = ({
   estimatedTime,
   assignee_name,
   onDragStart,
+  onDragEnd,
   onAssignClick,
   onPriorityChange,
   onDelete,
   onUpdate,
+  className,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
@@ -46,13 +48,13 @@ const Task = ({
   const [editedTitle, setEditedTitle] = useState(title);
   const [editedDescription, setEditedDescription] = useState(description);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const titleInputRef = useRef(null);
 
   useEffect(() => {
     if (isEditing) {
       titleInputRef.current?.focus();
 
-      // Check if tooltip has been dismissed before
       if (!isMobileDevice()) {
         const tooltipDismissed = localStorage.getItem(TOOLTIP_STORAGE_KEY);
         if (!tooltipDismissed) {
@@ -62,7 +64,14 @@ const Task = ({
     }
   }, [isEditing]);
 
-  const dismissTooltip = () => {
+  // Update local state when props change
+  useEffect(() => {
+    setEditedTitle(title);
+    setEditedDescription(description);
+  }, [title, description]);
+
+  const dismissTooltip = (e) => {
+    e.stopPropagation();
     setShowTooltip(false);
     localStorage.setItem(TOOLTIP_STORAGE_KEY, "true");
   };
@@ -79,6 +88,36 @@ const Task = ({
       setIsEditing(true);
       setIsExpanded(true);
     }
+  };
+
+  const handleDragStart = (e) => {
+    if (!isEditing) {
+      setIsDragging(true);
+      if (showPriorityMenu) {
+        setShowPriorityMenu(false);
+      }
+      onDragStart(e);
+
+      // Set ghost drag image
+      const dragImage = e.currentTarget.cloneNode(true);
+      dragImage.style.position = "absolute";
+      dragImage.style.top = "-9999px";
+      dragImage.style.opacity = "0.8";
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 0, 0);
+
+      // Clean up ghost element after drag starts
+      setTimeout(() => {
+        document.body.removeChild(dragImage);
+      }, 0);
+    } else {
+      e.preventDefault();
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    setIsDragging(false);
+    onDragEnd?.(e);
   };
 
   const handleEditClick = (e) => {
@@ -153,10 +192,13 @@ const Task = ({
   return (
     <div
       draggable={!isEditing}
-      onDragStart={(e) => onDragStart(e, id)}
-      className={`group bg-white p-3 rounded shadow-sm ${
-        isEditing ? "cursor-default" : "cursor-move"
-      } hover:shadow-md transition-shadow relative`}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className={`group bg-white p-3 rounded shadow-sm 
+        ${isEditing ? "cursor-default" : "cursor-move"} 
+        ${isDragging ? "opacity-50" : "opacity-100"}
+        hover:shadow-md transition-all duration-200
+        ${className || ""}`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
     >
@@ -273,8 +315,8 @@ const Task = ({
                 <button
                   onClick={handleEditClick}
                   className="p-1.5 rounded hover:bg-blue-100 text-blue-600 
-                  opacity-0 group-hover:opacity-100 
-                  transition-all duration-200 ease-in-out"
+                    opacity-0 group-hover:opacity-100 
+                    transition-all duration-200 ease-in-out"
                   title="Edit task"
                 >
                   <Edit2 size={16} />
