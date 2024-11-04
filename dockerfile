@@ -10,7 +10,7 @@ RUN apk add --no-cache tini postgresql-client
 COPY package*.json ./
 
 # Install ALL dependencies (both production and development)
-RUN npm install pg express dotenv vite-express
+RUN npm install pg express dotenv vite-express canvas-confetti
 RUN npm install
 
 # Copy project files
