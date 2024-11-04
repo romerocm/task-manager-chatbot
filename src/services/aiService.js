@@ -409,6 +409,7 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
 }
 
 export {
+  findUserByName,
   generateTasks,
   processTaskAssignments,
   processTaskDeletions,
