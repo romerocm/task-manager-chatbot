@@ -51,7 +51,6 @@ const Board = forwardRef((props, ref) => {
     }, {});
   };
 
-  // Updated updateTaskPositions function
   const updateTaskPositions = async (columnId, tasks) => {
     try {
       const positions = tasks.map((task, index) => ({
@@ -160,7 +159,6 @@ const Board = forwardRef((props, ref) => {
     setDragPosition(null);
   };
 
-  // Updated handleDrop function
   const handleDrop = async (e, targetColumnId) => {
     e.preventDefault();
     e.stopPropagation();
@@ -174,17 +172,19 @@ const Board = forwardRef((props, ref) => {
 
     if (!sourceColumn || !targetColumn) return;
 
+    const draggedTaskIndex = sourceColumn.tasks.findIndex(
+      (t) => t.id === parseInt(taskId)
+    );
+    if (draggedTaskIndex === -1) return;
+
+    // Get the dragged task
+    const draggedTask = sourceColumn.tasks[draggedTaskIndex];
+
     // If dropping in the same column, reorder tasks
     if (sourceColumnId === targetColumnId) {
       const tasks = [...sourceColumn.tasks];
-      const draggedTaskIndex = tasks.findIndex(
-        (t) => t.id === parseInt(taskId)
-      );
-
-      if (draggedTaskIndex === -1) return;
-
-      // Get the dragged task and remove it from the array
-      const [draggedTask] = tasks.splice(draggedTaskIndex, 1);
+      // Remove the dragged task
+      tasks.splice(draggedTaskIndex, 1);
 
       // Determine insert position
       let insertIndex;
@@ -192,17 +192,24 @@ const Board = forwardRef((props, ref) => {
         // If dropping at the end of a column
         insertIndex = tasks.length;
       } else {
-        // Find the target task index
+        // Find the target task index for dropping between tasks
         const targetIndex = tasks.findIndex(
           (t) => t.id === parseInt(dragOverTask)
         );
-        insertIndex = dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
+        if (targetIndex > -1) {
+          // If dropping on top of a task, place before or after based on drop position
+          insertIndex =
+            dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
+        } else {
+          // Fallback to end of list if target not found
+          insertIndex = tasks.length;
+        }
       }
 
       // Insert the task at the new position
       tasks.splice(insertIndex, 0, draggedTask);
 
-      // Update local state immediately for better UX
+      // Update local state immediately
       setColumns(
         columns.map((col) =>
           col.id === sourceColumnId ? { ...col, tasks } : col
@@ -212,12 +219,16 @@ const Board = forwardRef((props, ref) => {
       // Persist the new order
       await updateTaskPositions(targetColumnId, tasks);
     } else {
-      // Moving task between columns
+      // Moving between columns
       try {
+        const sourceTasks = [...sourceColumn.tasks];
         const targetTasks = [...targetColumn.tasks];
-        let insertIndex;
 
-        // Calculate the insert position
+        // Remove from source column
+        sourceTasks.splice(draggedTaskIndex, 1);
+
+        // Determine target insert position
+        let insertIndex;
         if (!dragOverTask || dragOverTask.startsWith("column-end-")) {
           insertIndex = targetTasks.length;
         } else {
@@ -225,16 +236,17 @@ const Board = forwardRef((props, ref) => {
             (t) => t.id === parseInt(dragOverTask)
           );
           insertIndex =
-            dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
+            targetIndex > -1
+              ? dragPosition === "bottom"
+                ? targetIndex + 1
+                : targetIndex
+              : targetTasks.length;
         }
 
-        const draggedTask = sourceColumn.tasks.find(
-          (t) => t.id === parseInt(taskId)
-        );
+        // Insert into target column
+        targetTasks.splice(insertIndex, 0, draggedTask);
 
-        if (!draggedTask) return;
-
-        // Update the task's status and position
+        // Update task status and position in database
         const response = await fetch(`/api/tasks/${taskId}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -245,29 +257,20 @@ const Board = forwardRef((props, ref) => {
         });
 
         if (response.ok) {
-          // Remove task from source column
-          const updatedSourceTasks = sourceColumn.tasks.filter(
-            (t) => t.id !== parseInt(taskId)
-          );
-
-          // Add task to target column
-          const updatedTargetTasks = [...targetTasks];
-          updatedTargetTasks.splice(insertIndex, 0, draggedTask);
-
-          // Update both columns' positions
+          // Update positions in both columns
           await Promise.all([
-            updateTaskPositions(sourceColumnId, updatedSourceTasks),
-            updateTaskPositions(targetColumnId, updatedTargetTasks),
+            updateTaskPositions(sourceColumnId, sourceTasks),
+            updateTaskPositions(targetColumnId, targetTasks),
           ]);
 
           // Update local state
           setColumns((prevColumns) =>
             prevColumns.map((col) => {
               if (col.id === sourceColumnId) {
-                return { ...col, tasks: updatedSourceTasks };
+                return { ...col, tasks: sourceTasks };
               }
               if (col.id === targetColumnId) {
-                return { ...col, tasks: updatedTargetTasks };
+                return { ...col, tasks: targetTasks };
               }
               return col;
             })
@@ -275,7 +278,7 @@ const Board = forwardRef((props, ref) => {
         }
       } catch (error) {
         console.error("Error moving task between columns:", error);
-        await fetchTasks(); // Revert to original state if there's an error
+        await fetchTasks();
       }
     }
 
