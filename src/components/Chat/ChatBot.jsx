@@ -62,12 +62,12 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "is responsible for",
       "assign all",
       "assign everything",
-      "delete last",
-      "remove last",
-      "clear last",
-      "undo",
-      "revert",
-      "restore",
+      "allocate",
+      "distribute",
+      "hand over",
+      "entrust",
+      "task to",
+      "assign tasks to",
     ];
 
     return assignmentKeywords.some((keyword) =>
@@ -82,6 +82,10 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "clear",
       "erase",
       "get rid of",
+      "discard",
+      "eliminate",
+      "wipe out",
+      "purge",
     ];
 
     const columnKeywords = {
@@ -90,6 +94,8 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "to do": "todo",
       "todo": "todo",
       "done": "done",
+      "completed": "done",
+      "finished": "done",
     };
 
     const isDeletion = deletionKeywords.some((keyword) =>
@@ -101,8 +107,6 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     );
 
     return { isDeletion, column: column ? columnKeywords[column] : null };
-
-    return { isDeletion, column };
   };
 
   const handleSend = async () => {
