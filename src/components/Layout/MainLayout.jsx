@@ -19,7 +19,7 @@ const MainLayout = () => {
     <div className="flex h-screen bg-gradient-to-r from-blue-100 to-purple-100">
       <div className="flex-1 p-6 overflow-auto">
         <div className="flex justify-between items-center mb-6 shadow-lg p-4 bg-white rounded-lg">
-          <div className="flex items-center">
+          <div className="flex items-center justify-between w-full">
             <img src={logo} alt="Logo" className="h-8 mr-2" />
             <h1 className="text-2xl font-bold text-gray-800">Task Manager</h1>
           </div>
