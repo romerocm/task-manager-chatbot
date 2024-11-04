@@ -229,10 +229,6 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         >
           Clear Chat
         </button>
-        <p className="text-sm text-gray-600">
-          I can help create, assign, and manage tasks!
-        </p>
-        {error && <div className="mt-2 text-sm text-red-500">{error}</div>}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
