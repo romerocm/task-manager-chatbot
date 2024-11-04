@@ -285,14 +285,14 @@ const Task = ({
           <div className="relative">
             <button
               onClick={handlePriorityClick}
-              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${PRIORITY_COLORS[priority]}`}
+              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${PRIORITY_COLORS[priority]} z-50 relative`}
             >
               {priority}
               <ChevronDown size={12} />
             </button>
 
             {showPriorityMenu && (
-              <div ref={dropdownRef} className="absolute bg-white rounded-lg shadow-lg border p-1 z-50 mt-1">
+              <div ref={dropdownRef} className="absolute bg-white rounded-lg shadow-lg border p-1 z-50 mt-1" style={{ zIndex: 1000 }}>
                 {Object.keys(PRIORITY_COLORS).map((p) => (
                   <button
                     key={p}
