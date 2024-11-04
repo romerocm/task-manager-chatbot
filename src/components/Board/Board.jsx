@@ -294,6 +294,14 @@ const Board = forwardRef((props, ref) => {
               return col;
             })
           );
+          // Check if "In Progress" column is empty and trigger confetti
+          if (sourceColumnId === "inProgress" && sourceTasks.length === 0) {
+            confetti({
+              particleCount: 200,
+              spread: 100,
+              origin: { y: 0.6 },
+            });
+          }
         }
       } catch (error) {
         console.error("Error moving task between columns:", error);
