@@ -12,7 +12,7 @@ import TaskAssignmentModal from "./TaskAssignmentModal";
 const RippleEffect = ({ x, y, onAnimationEnd }) => {
   return (
     <div
-      className="absolute w-2 h-2 rounded-full bg-blue-400/20 pointer-events-none shadow-neumorphism"
+      className="absolute w-2 h-2 rounded-full bg-blue-400/20 pointer-events-none"
       style={{
         left: x - 8, // Center the ripple (half of width)
         top: y - 8, // Center the ripple (half of height)
