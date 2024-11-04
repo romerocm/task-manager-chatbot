@@ -220,7 +220,6 @@ const Task = ({
         hover:shadow-md transition-all duration-200
         ${className || ""}`}
       onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
     >
       {/* Keyboard Shortcuts Tooltip */}
       {showTooltip && isEditing && (
