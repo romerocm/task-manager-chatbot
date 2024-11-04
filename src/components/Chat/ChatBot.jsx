@@ -101,18 +101,18 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         console.log("Processing deletion request:", input);
         const result = await processTaskDeletions(input);
 
-        if (!result.success) {
-          throw new Error(result.error || "Failed to process deletions");
+        if (!result || !result.success) {
+          throw new Error(result?.error || "Failed to process deletions");
         }
 
         const deletionMessage = {
           id: Date.now() + 1,
-          text: result.data.message,
+          text: result.data?.message || "Tasks deleted successfully.",
           sender: "ai",
         };
         setMessages((prev) => [...prev, deletionMessage]);
 
-        if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
+        if (result.data?.tasksUpdated && boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
         }
       } else if (isAssignmentRequest) {
@@ -203,7 +203,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         ))}
         {isLoading && (
           <div className="flex justify-center">
-            <div className="animate-pulse text-gray-500">Thinking...</div>
+            <div className="text-gray-500 animate-pulse">Thinking...</div>
           </div>
         )}
         <div ref={messagesEndRef} />
