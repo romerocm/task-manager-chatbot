@@ -43,6 +43,7 @@ lerna-debug.log*
 
 # Local development files
 *.local
+.venv
 
 # Optional npm cache directory
 .npm
@@ -60,3 +61,4 @@ docker-volumes/
 # System Files
 .DS_Store
 Thumbs.db
+.aider*
