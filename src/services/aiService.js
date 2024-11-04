@@ -366,7 +366,9 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
     const allTasks = await getAllTasks();
     let tasksToDelete = [];
 
-    if (deleteData.deleteAll) {
+    if (deleteData.deleteAll && deleteData.column) {
+      tasksToDelete = allTasks.filter(task => task.status === deleteData.column);
+    } else if (deleteData.deleteAll) {
       tasksToDelete = allTasks;
     } else if (deleteData.specificTasks?.length > 0) {
       tasksToDelete = allTasks.filter((task) =>
