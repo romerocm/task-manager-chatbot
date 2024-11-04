@@ -168,7 +168,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
-        if (result.data?.tasksUpdated && boardRef.current?.fetchTasks) {
+        if (boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
         }
       } else if (isAssignmentRequest) {
