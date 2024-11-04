@@ -43,7 +43,8 @@ const PROMPTS = {
       "assignAll": true,
       "specificTasks": [],
       "column": "todo"
-    }
+    },
+      "column": "inProgress"
     
     Or for specific tasks:
     {
@@ -58,11 +59,13 @@ const PROMPTS = {
     taskDeletion: `Given the request to delete tasks, determine:
     1. Whether all tasks should be deleted
     2. Or which specific tasks should be deleted
+    3. The column (status) of the tasks to be deleted, e.g., "todo", "inProgress", "done"
 
     Response must be a JSON object with:
     - "deleteAll": Boolean indicating if all tasks should be deleted
     - "specificTasks": Array of task titles if not deleting all
     - "deleteLastN": Number of last tasks to delete if specified
+    - "column": The column (status) of the tasks to be deleted, e.g., "todo", "inProgress", "done"
 
     Example format: {
       "deleteAll": false,
