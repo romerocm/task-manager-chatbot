@@ -203,7 +203,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         ))}
         {isLoading && (
           <div className="flex justify-center">
-            <div className="animate-pulse text-gray-500">Thinking...</div>
+            <div className="text-gray-500 animate-pulse">Thinking...</div>
           </div>
         )}
         <div ref={messagesEndRef} />
