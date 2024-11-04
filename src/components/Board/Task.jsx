@@ -371,7 +371,7 @@ const Task = ({
               />
             ) : (
               description && (
-                <p className="text-sm text-gray-600">{description}</p>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">{description}</p>
               )
             )}
             {!isEditing && assignee_name && (
