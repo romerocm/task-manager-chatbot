@@ -301,17 +301,22 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
     }
 
     const allTasks = await getAllTasks();
-    const column = assignmentData.column || "todo";
-    let tasksToAssign = allTasks.filter(task => task.status === column);
+    let tasksToAssign;
 
-    if (!assignmentData.assignAll && assignmentData.specificTasks?.length > 0) {
-      tasksToAssign = tasksToAssign.filter((task) =>
+    if (assignmentData.assignAll) {
+      // Assign all tasks from all columns if no specific column is mentioned
+      tasksToAssign = assignmentData.column
+        ? allTasks.filter(task => task.status === assignmentData.column)
+        : allTasks;
+    } else if (assignmentData.specificTasks?.length > 0) {
+      tasksToAssign = allTasks.filter((task) =>
         assignmentData.specificTasks.some((title) =>
           task.title.toLowerCase().includes(title.toLowerCase())
         )
       );
-    } else if (!assignmentData.assignAll && assignmentData.specificTasks?.length === 0) {
-      // If no specific tasks are mentioned, assign all tasks in the default column
+    } else {
+      // Default to assigning all tasks in the specified column or "todo" if none specified
+      const column = assignmentData.column || "todo";
       tasksToAssign = allTasks.filter(task => task.status === column);
     }
 
