@@ -19,6 +19,8 @@ const Message = ({ text, sender }) => {
   );
 };
 
+export default Message;
+
 <style>
   {`
     @keyframes slideIn {
