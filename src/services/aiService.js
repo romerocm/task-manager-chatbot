@@ -28,23 +28,27 @@ const PROMPTS = {
     taskAssignment: `Given the request to assign tasks, determine:
     1. The assignee name from the request
     2. Which tasks should be assigned
+    3. The column (status) of the tasks to be assigned
 
     Response must be a JSON object with:
     - "assigneeName": The full name of the person to assign tasks to
     - "assignAll": Boolean indicating if all tasks should be assigned
     - "specificTasks": Array of task titles if not assigning all tasks
+    - "column": The column (status) of the tasks to be assigned
 
     Example format: {
       "assigneeName": "Carlos Romero",
       "assignAll": true,
-      "specificTasks": []
+      "specificTasks": [],
+      "column": "todo"
     }
     
     Or for specific tasks:
     {
       "assigneeName": "Carlos Romero",
       "assignAll": false,
-      "specificTasks": ["Setup database", "Create API"]
+      "specificTasks": ["Setup database", "Create API"],
+      "column": "inProgress"
     }
     
     Respond with ONLY the JSON, no other text.`,
@@ -291,12 +295,11 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
     }
 
     const allTasks = await getAllTasks();
-    let tasksToAssign = [];
+    const column = assignmentData.column || "todo";
+    let tasksToAssign = allTasks.filter(task => task.status === column);
 
-    if (assignmentData.assignAll) {
-      tasksToAssign = allTasks;
-    } else if (assignmentData.specificTasks?.length > 0) {
-      tasksToAssign = allTasks.filter((task) =>
+    if (!assignmentData.assignAll && assignmentData.specificTasks?.length > 0) {
+      tasksToAssign = tasksToAssign.filter((task) =>
         assignmentData.specificTasks.some((title) =>
           task.title.toLowerCase().includes(title.toLowerCase())
         )
