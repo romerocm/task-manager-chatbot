@@ -18,7 +18,9 @@ const MainLayout = () => {
     <div className="flex h-screen bg-gray-100">
       <div className="flex-1 p-6 overflow-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Task Manager</h1>
+          <div className="flex items-center">
+            <img src="/src/assets/images/logo.svg" alt="Logo" className="h-12 mr-2" style={{ height: "30px", width: "auto" }} />
+          </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
