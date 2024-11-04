@@ -68,18 +68,6 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "undo",
       "revert",
       "restore",
-      "set",
-      "allocate",
-      "appoint",
-      "designate",
-      "entrust",
-      "hand over",
-      "pass on",
-      "transfer",
-      "turn over",
-      "assign to",
-      "set to",
-      "give responsibility to",
     ];
 
     return assignmentKeywords.some((keyword) =>
