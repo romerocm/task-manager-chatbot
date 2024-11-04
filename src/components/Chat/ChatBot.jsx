@@ -1,6 +1,6 @@
 // src/components/Chat/ChatBot.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { Send } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import {
   generateTasks,
   processTaskAssignments,
@@ -225,9 +225,10 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
             setMessages([]);
             localStorage.removeItem("chatMessages");
           }}
-          className="text-sm text-blue-500 hover:underline"
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          title="Clear Chat"
         >
-          Clear Chat
+          <Trash2 size={20} className="text-gray-600" />
         </button>
       </div>
 
