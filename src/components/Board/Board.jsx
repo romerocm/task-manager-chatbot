@@ -20,6 +20,11 @@ const Board = forwardRef((props, ref) => {
   const [dragOverTask, setDragOverTask] = useState(null);
   const [dragPosition, setDragPosition] = useState(null);
 
+  const [isFreshBoard, setIsFreshBoard] = useState(() => {
+    const storedValue = localStorage.getItem("tasksAdded");
+    return storedValue !== "true";
+  });
+
   const fetchTasks = async () => {
     try {
       const response = await fetch("/api/tasks");
@@ -32,17 +37,21 @@ const Board = forwardRef((props, ref) => {
             tasks: organizedTasks[col.id] || [],
           }))
         );
+        if (data.tasks.length > 0) {
+          localStorage.setItem("tasksAdded", "true");
+          setIsFreshBoard(false);
+        }
+        // Ensure each card in a column is stacked above the one below it
+        setColumns((prevColumns) =>
+          prevColumns.map((col) => ({
+            ...col,
+            tasks: col.tasks.map((task, index) => ({
+              ...task,
+              zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
+            })),
+          }))
+        );
       }
-      // Ensure each card in a column is stacked above the one below it
-      setColumns((prevColumns) =>
-        prevColumns.map((col) => ({
-          ...col,
-          tasks: col.tasks.map((task, index) => ({
-            ...task,
-            zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
-          })),
-        }))
-      );
     } catch (error) {
       console.error("Error fetching tasks:", error);
     }
@@ -465,6 +474,11 @@ const Board = forwardRef((props, ref) => {
               {column.title} ({column.tasks.length})
             </h2>
             <div className="space-y-2 min-h-[50px]">
+              {isFreshBoard && column.tasks.length === 0 && (
+                <div className="text-center text-gray-500 py-4">
+                  No tasks yet. Start by adding a new task!
+                </div>
+              )}
               {column.tasks.map((task, index) => (
                 <div
                   key={task.id}
