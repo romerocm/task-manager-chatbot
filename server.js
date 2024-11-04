@@ -437,58 +437,30 @@ app.post("/api/tasks/delete", async (req, res) => {
   }
 });
 
-app.put("/api/tasks/:taskId/priority", async (req, res) => {
+app.put("/api/tasks/:taskId", async (req, res) => {
   try {
     const { taskId } = req.params;
-    const { priority } = req.body;
+    const updates = req.body;
 
-    // Validate priority
-    const validPriorities = ["high", "medium", "low"];
-    if (!validPriorities.includes(priority)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid priority value",
-      });
-    }
+    console.log(`Received update request for task ID: ${taskId}`, updates);
 
     const result = await db.query(
       `UPDATE tasks 
-       SET priority = $1, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $2 
+       SET title = $1, description = $2, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $3 
        RETURNING *`,
-      [priority, taskId]
+      [updates.title, updates.description, taskId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "Task not found",
-      });
+      console.warn(`Task with ID ${taskId} not found`);
+      return res.status(404).json({ success: false, error: "Task not found" });
     }
 
-    // Get the updated task with assignee information
-    const taskWithAssignee = await db.query(
-      `SELECT 
-        t.*,
-        u.name as assignee_name,
-        u.email as assignee_email,
-        u.avatar_url as assignee_avatar
-       FROM tasks t
-       LEFT JOIN users u ON t.assignee_id = u.id
-       WHERE t.id = $1`,
-      [taskId]
-    );
-
-    res.json({
-      success: true,
-      task: taskWithAssignee.rows[0],
-    });
+    res.json({ success: true, task: result.rows[0] });
   } catch (error) {
-    console.error("Error updating task priority:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    console.error("Error updating task:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
