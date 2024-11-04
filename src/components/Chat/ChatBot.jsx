@@ -1,7 +1,8 @@
 // src/components/Chat/ChatBot.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Send, Trash2 } from "lucide-react";
-import { findUserByName,
+import {
+  findUserByName,
   generateTasks,
   processTaskAssignments,
   processTaskDeletions,
@@ -90,12 +91,12 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
 
     const columnKeywords = {
       "in progress": "inprogress",
-      "inprogress": "inprogress",
+      inprogress: "inprogress",
       "to do": "todo",
-      "todo": "todo",
-      "done": "done",
-      "completed": "done",
-      "finished": "done",
+      todo: "todo",
+      done: "done",
+      completed: "done",
+      finished: "done",
     };
 
     const isDeletion = deletionKeywords.some((keyword) =>
@@ -186,7 +187,10 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       } else if (isAssignmentRequest) {
         console.log("Processing assignment request:", input);
         let result;
-        if (input.toLowerCase().includes("those") && lastCreatedTasks.length > 0) {
+        if (
+          input.toLowerCase().includes("those") &&
+          lastCreatedTasks.length > 0
+        ) {
           const taskTitles = lastCreatedTasks.map((task) => task.title);
           result = await processTaskAssignments(
             `assign ${taskTitles.join(", ")} to ${input.split("to")[1].trim()}`
@@ -236,7 +240,10 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           };
           setMessages((prev) => {
             const updatedMessages = [...prev, restoreMessage];
-            localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+            localStorage.setItem(
+              "chatMessages",
+              JSON.stringify(updatedMessages)
+            );
             return updatedMessages;
           });
 
@@ -252,7 +259,10 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           };
           setMessages((prev) => {
             const updatedMessages = [...prev, noTasksMessage];
-            localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+            localStorage.setItem(
+              "chatMessages",
+              JSON.stringify(updatedMessages)
+            );
             return updatedMessages;
           });
         }
@@ -264,18 +274,22 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           throw new Error(result.error || "Failed to generate tasks");
         }
 
-        const tasks = await Promise.all(result.data.map(async (task) => {
-          if (task.assigneeName) {
-            task.assignee = await findUserByName(task.assigneeName);
-          }
-          return task;
-        }));
+        const tasks = await Promise.all(
+          result.data.map(async (task) => {
+            if (task.assigneeName) {
+              task.assignee = await findUserByName(task.assigneeName);
+            }
+            return task;
+          })
+        );
 
         // Fetch the newly created tasks to ensure we have their IDs
-        const updatedTasks = await fetch("/api/tasks").then(res => res.json()).then(data => data.tasks);
+        const updatedTasks = await fetch("/api/tasks")
+          .then((res) => res.json())
+          .then((data) => data.tasks);
 
-        const tasksWithIds = tasks.map(task => {
-          const matchedTask = updatedTasks.find(t => t.title === task.title);
+        const tasksWithIds = tasks.map((task) => {
+          const matchedTask = updatedTasks.find((t) => t.title === task.title);
           return { ...task, id: matchedTask ? matchedTask.id : undefined };
         });
 
@@ -301,16 +315,18 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           (task) => task.assigneeName && task.id
         );
         if (tasksToAssign.length > 0) {
-          await Promise.all(tasksToAssign.map(async task => {
-            const assignee = await findUserByName(task.assigneeName);
-            if (assignee) {
-              await fetch(`/api/tasks/${task.id}/assign`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ assigneeId: assignee.id }),
-              });
-            }
-          }));
+          await Promise.all(
+            tasksToAssign.map(async (task) => {
+              const assignee = await findUserByName(task.assigneeName);
+              if (assignee) {
+                await fetch(`/api/tasks/${task.id}/assign`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ assigneeId: assignee.id }),
+                });
+              }
+            })
+          );
         }
         if (tasksWithIds.length > 0) {
           onTasksGenerated(tasksWithIds);
@@ -401,7 +417,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
             className={`p-2 rounded-lg ${
               isLoading || !input.trim()
                 ? "bg-gray-300 cursor-not-allowed"
-                : "bg-gradient-to-r from-blue-100 to-purple-100 hover:from-blue-200 hover:to-purple-200 text-white"
+                : "bg-gradient-to-r from-blue-100 to-purple-100 hover:from-blue-200 hover:to-purple-200 text-indigo-500"
             }`}
           >
             <Send size={20} />
