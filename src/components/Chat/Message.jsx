@@ -11,7 +11,7 @@ const Message = ({ text, sender }) => {
             ? "bg-blue-500 text-white"
             : "bg-gray-100 text-gray-800"
         }`}
-        style={{ animation: "fadeIn 0.5s forwards" }}
+        style={{ animation: "fadeIn 0.5s forwards, slideIn 0.5s ease-out" }}
       >
         {text}
       </div>
@@ -20,3 +20,18 @@ const Message = ({ text, sender }) => {
 };
 
 export default Message;
+
+<style>
+  {`
+    @keyframes slideIn {
+      from {
+        transform: translateX(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  `}
+</style>
