@@ -306,6 +306,9 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
           task.title.toLowerCase().includes(title.toLowerCase())
         )
       );
+    } else if (!assignmentData.assignAll && assignmentData.specificTasks?.length === 0) {
+      // If no specific tasks are mentioned, assign all tasks in the default column
+      tasksToAssign = allTasks.filter(task => task.status === column);
     }
 
     if (tasksToAssign.length === 0) {
