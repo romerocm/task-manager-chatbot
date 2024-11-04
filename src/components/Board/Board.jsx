@@ -5,6 +5,7 @@ import React, {
   useImperativeHandle,
 } from "react";
 import Task from "./Task";
+import confetti from "canvas-confetti";
 import TaskAssignmentModal from "./TaskAssignmentModal";
 
 const Board = forwardRef((props, ref) => {
@@ -101,6 +102,14 @@ const Board = forwardRef((props, ref) => {
         const data = await response.json();
         if (data.success) {
           await fetchTasks();
+          // Trigger confetti when a task is moved to the "Done" column
+          if (targetColumnId === "done") {
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 },
+            });
+          }
         }
       } catch (error) {
         console.error("Error adding tasks:", error);
