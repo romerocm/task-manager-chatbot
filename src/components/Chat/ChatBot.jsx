@@ -84,9 +84,17 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "get rid of",
     ];
 
-    return deletionKeywords.some((keyword) =>
+    const columnKeywords = ["in progress", "to do", "done"];
+
+    const isDeletion = deletionKeywords.some((keyword) =>
       input.toLowerCase().includes(keyword.toLowerCase())
     );
+
+    const column = columnKeywords.find((col) =>
+      input.toLowerCase().includes(col)
+    );
+
+    return { isDeletion, column };
   };
 
   const handleSend = async () => {
@@ -110,12 +118,40 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
 
     try {
       const isAssignmentRequest = parseAssignmentIntent(input);
-      const isDeletionRequest = parseDeletionIntent(input);
+      const { isDeletion, column } = parseDeletionIntent(input);
 
-      if (isDeletionRequest) {
+      if (isDeletion) {
         console.log("Processing deletion request:", input);
-        const result = await processTaskDeletions(input);
-        setLastDeletedTasks(result.data?.deletedTasks || []);
+        let result;
+        if (column) {
+          // Fetch tasks in the specified column
+          const response = await fetch("/api/tasks");
+          const data = await response.json();
+          if (!data.success) throw new Error("Failed to fetch tasks");
+
+          const tasksToDelete = data.tasks
+            .filter((task) => task.status.toLowerCase() === column)
+            .map((task) => task.id);
+
+          if (tasksToDelete.length > 0) {
+            result = await fetch("/api/tasks/delete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ taskIds: tasksToDelete }),
+            }).then((res) => res.json());
+
+            if (!result.success) {
+              throw new Error(result.error || "Failed to delete tasks");
+            }
+
+            setLastDeletedTasks(tasksToDelete);
+          } else {
+            throw new Error(`No tasks found in the "${column}" column`);
+          }
+        } else {
+          result = await processTaskDeletions(input);
+          setLastDeletedTasks(result.data?.deletedTasks || []);
+        }
 
         if (!result || !result.success) {
           throw new Error(result?.error || "Failed to process deletions");
