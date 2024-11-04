@@ -62,6 +62,7 @@ const PROMPTS = {
     Response must be a JSON object with:
     - "deleteAll": Boolean indicating if all tasks should be deleted
     - "specificTasks": Array of task titles if not deleting all
+    - "deleteLastN": Number of last tasks to delete if specified
 
     Example format: {
       "deleteAll": false,
@@ -373,6 +374,8 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
           task.title.toLowerCase().includes(title.toLowerCase())
         )
       );
+    } else if (deleteData.deleteLastN) {
+      tasksToDelete = allTasks.slice(-deleteData.deleteLastN);
     }
 
     if (tasksToDelete.length === 0) {

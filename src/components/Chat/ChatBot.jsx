@@ -60,6 +60,9 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "is responsible for",
       "assign all",
       "assign everything",
+      "delete last",
+      "remove last",
+      "clear last",
     ];
 
     return assignmentKeywords.some((keyword) =>
