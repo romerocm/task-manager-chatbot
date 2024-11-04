@@ -35,7 +35,7 @@ const Board = forwardRef((props, ref) => {
           columns.map((col) => ({
             ...col,
             tasks: organizedTasks[col.id] || [],
-          }));
+          }))
         );
         if (data.tasks.length > 0) {
           localStorage.setItem("tasksAdded", "true");
