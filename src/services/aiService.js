@@ -304,9 +304,9 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
     let tasksToAssign;
 
     if (assignmentData.assignAll) {
-      // Assign all tasks from all columns if no specific column is mentioned
+      // Assign all tasks from the specified column or all columns if none specified
       tasksToAssign = assignmentData.column
-        ? allTasks.filter(task => task.status === assignmentData.column)
+        ? allTasks.filter(task => task.status.toLowerCase() === assignmentData.column.toLowerCase())
         : allTasks;
     } else if (assignmentData.specificTasks?.length > 0) {
       tasksToAssign = allTasks.filter((task) =>
@@ -317,7 +317,7 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
     } else {
       // Default to assigning all tasks in the specified column or "todo" if none specified
       const column = assignmentData.column || "todo";
-      tasksToAssign = allTasks.filter(task => task.status === column);
+      tasksToAssign = allTasks.filter(task => task.status.toLowerCase() === column.toLowerCase());
     }
 
     if (tasksToAssign.length === 0) {
