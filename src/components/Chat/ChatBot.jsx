@@ -85,7 +85,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     ];
 
     const columnKeywords = {
-      "in progress": "inProgress",
+      "in progress": "inprogress",
       "to do": "todo",
       "todo": "todo",
       "done": "done",
