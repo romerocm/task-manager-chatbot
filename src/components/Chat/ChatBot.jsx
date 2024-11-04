@@ -1,6 +1,6 @@
 // src/components/Chat/ChatBot.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { Send } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import {
   generateTasks,
   processTaskAssignments,
@@ -9,7 +9,10 @@ import {
 import Message from "./Message";
 
 const ChatBot = ({ onTasksGenerated, boardRef }) => {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    const savedMessages = localStorage.getItem("chatMessages");
+    return savedMessages ? JSON.parse(savedMessages) : [];
+  });
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -90,7 +93,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       sender: "user",
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => {
+      const updatedMessages = [...prev, userMessage];
+      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
     setInput("");
 
     try {
@@ -110,7 +117,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           text: result.data?.message || "Tasks deleted successfully.",
           sender: "ai",
         };
-        setMessages((prev) => [...prev, deletionMessage]);
+        setMessages((prev) => {
+          const updatedMessages = [...prev, deletionMessage];
+          localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+          return updatedMessages;
+        });
 
         if (result.data?.tasksUpdated && boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
@@ -128,7 +139,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           text: result.data.message,
           sender: "ai",
         };
-        setMessages((prev) => [...prev, assignmentMessage]);
+        setMessages((prev) => {
+          const updatedMessages = [...prev, assignmentMessage];
+          localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+          return updatedMessages;
+        });
 
         if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
@@ -152,7 +167,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           sender: "ai",
         };
 
-        setMessages((prev) => [...prev, aiMessage]);
+        setMessages((prev) => {
+          const updatedMessages = [...prev, aiMessage];
+          localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+          return updatedMessages;
+        });
 
         if (tasks.length > 0) {
           onTasksGenerated(tasks);
@@ -167,7 +186,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         }`,
         sender: "ai",
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => {
+        const updatedMessages = [...prev, errorMessage];
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+        return updatedMessages;
+      });
       setError(error.message);
     } finally {
       setIsLoading(false);
@@ -189,12 +212,24 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <h2 className="font-semibold">AI Task Assistant</h2>
-        <p className="text-sm text-gray-600">
-          I can help create, assign, and manage tasks!
-        </p>
-        {error && <div className="mt-2 text-sm text-red-500">{error}</div>}
+      <div className="p-4 border-b flex justify-between items-center">
+        <div>
+          <h2 className="font-semibold">AI Task Assistant</h2>
+          <p className="text-sm text-gray-600">
+            I can help create, assign, and manage tasks!
+          </p>
+          {error && <div className="mt-2 text-sm text-red-500">{error}</div>}
+        </div>
+        <button
+          onClick={() => {
+            setMessages([]);
+            localStorage.removeItem("chatMessages");
+          }}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          title="Clear Chat"
+        >
+          <Trash2 size={20} className="text-gray-600" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
