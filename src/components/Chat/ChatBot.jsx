@@ -162,11 +162,20 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           }
           return task;
         }));
+
+        // Fetch the newly created tasks to ensure we have their IDs
+        const updatedTasks = await fetch("/api/tasks").then(res => res.json()).then(data => data.tasks);
+
+        const tasksWithIds = tasks.map(task => {
+          const matchedTask = updatedTasks.find(t => t.title === task.title);
+          return { ...task, id: matchedTask ? matchedTask.id : undefined };
+        });
+
         const aiMessage = {
           id: Date.now() + 1,
           text: `I've created ${
-            tasks.length
-          } tasks based on your request:\n${tasks
+            tasksWithIds.length
+          } tasks based on your request:\n${tasksWithIds
             .map((t) => `- ${t.title}`)
             .join("\n")}`,
           sender: "ai",
@@ -178,7 +187,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
-        const tasksToAssign = tasks.filter(task => task.assignee);
+        const tasksToAssign = tasksWithIds.filter(task => task.assignee && task.id);
         if (tasksToAssign.length > 0) {
           await Promise.all(tasksToAssign.map(task => 
             fetch(`/api/tasks/${task.id}/assign`, {
@@ -188,8 +197,8 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
             })
           ));
         }
-        if (tasks.length > 0) {
-          onTasksGenerated(tasks);
+        if (tasksWithIds.length > 0) {
+          onTasksGenerated(tasksWithIds);
         }
       }
     } catch (error) {
