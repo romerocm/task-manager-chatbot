@@ -156,7 +156,12 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           throw new Error(result.error || "Failed to generate tasks");
         }
 
-        const tasks = result.data;
+        const tasks = result.data.map(task => {
+          if (task.assigneeName) {
+            task.assignee = await findUserByName(task.assigneeName);
+          }
+          return task;
+        });
         const aiMessage = {
           id: Date.now() + 1,
           text: `I've created ${
@@ -173,6 +178,16 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
+        const tasksToAssign = tasks.filter(task => task.assignee);
+        if (tasksToAssign.length > 0) {
+          await Promise.all(tasksToAssign.map(task => 
+            fetch(`/api/tasks/${task.id}/assign`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ assigneeId: task.assignee.id }),
+            })
+          ));
+        }
         if (tasks.length > 0) {
           onTasksGenerated(tasks);
         }
