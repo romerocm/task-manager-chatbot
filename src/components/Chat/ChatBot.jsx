@@ -18,6 +18,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
   const [error, setError] = useState(null);
   const [lastDeletedTasks, setLastDeletedTasks] = useState([]);
   const messagesEndRef = useRef(null);
+  const [lastCreatedTasks, setLastCreatedTasks] = useState([]);
 
   // Check API configuration on component mount
   useEffect(() => {
@@ -136,7 +137,15 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         }
       } else if (isAssignmentRequest) {
         console.log("Processing assignment request:", input);
-        const result = await processTaskAssignments(input);
+        let result;
+        if (input.toLowerCase().includes("those") && lastCreatedTasks.length > 0) {
+          const taskTitles = lastCreatedTasks.map((task) => task.title);
+          result = await processTaskAssignments(
+            `assign ${taskTitles.join(", ")} to ${input.split("to")[1].trim()}`
+          );
+        } else {
+          result = await processTaskAssignments(input);
+        }
 
         if (!result.success) {
           throw new Error(result.error || "Failed to process assignments");
@@ -207,7 +216,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           throw new Error(result.error || "Failed to generate tasks");
         }
 
-        const tasks = await Promise.all(result.data.map(async task => {
+        const tasks = await Promise.all(result.data.map(async (task) => {
           if (task.assigneeName) {
             task.assignee = await findUserByName(task.assigneeName);
           }
@@ -238,7 +247,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
-        const tasksToAssign = tasksWithIds.filter(task => task.assigneeName && task.id);
+        setLastCreatedTasks(tasksWithIds);
+
+        const tasksToAssign = tasksWithIds.filter(
+          (task) => task.assigneeName && task.id
+        );
         if (tasksToAssign.length > 0) {
           await Promise.all(tasksToAssign.map(async task => {
             const assignee = await findUserByName(task.assigneeName);
