@@ -499,6 +499,7 @@ const Board = forwardRef((props, ref) => {
                           : "-translate-y-3"
                         : ""
                     }`}
+                    isTopCard={index === 0}
                   />
                   {dragOverTask === task.id && dragPosition === "bottom" && (
                     <div className="absolute -bottom-2 left-0 right-0 h-1 bg-blue-500 rounded-full" />
