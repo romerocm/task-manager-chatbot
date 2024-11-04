@@ -15,9 +15,9 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gradient-to-r from-blue-100 to-purple-100">
       <div className="flex-1 p-6 overflow-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 shadow-lg p-4 bg-white rounded-lg">
           <h1 className="text-2xl font-bold text-gray-800">Task Manager</h1>
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -29,7 +29,7 @@ const MainLayout = () => {
         </div>
         <Board ref={boardRef} />
       </div>
-      <div className="w-96 border-l border-gray-200 bg-white">
+      <div className="w-96 border-l border-gray-200 bg-white shadow-lg">
         <ChatBot onTasksGenerated={handleTasksGenerated} boardRef={boardRef} />
       </div>
       <SettingsModal

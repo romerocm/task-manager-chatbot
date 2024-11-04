@@ -364,7 +364,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
             setMessages([]);
             localStorage.removeItem("chatMessages");
           }}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="p-2 rounded-lg hover:bg-red-100 transition-colors shadow-md"
           title="Clear Chat"
         >
           <Trash2 size={20} className="text-gray-600" />
