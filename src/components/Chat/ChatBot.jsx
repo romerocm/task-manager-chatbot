@@ -187,15 +187,18 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
-        const tasksToAssign = tasksWithIds.filter(task => task.assignee && task.id);
+        const tasksToAssign = tasksWithIds.filter(task => task.assigneeName && task.id);
         if (tasksToAssign.length > 0) {
-          await Promise.all(tasksToAssign.map(task => 
-            fetch(`/api/tasks/${task.id}/assign`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ assigneeId: task.assignee.id }),
-            })
-          ));
+          await Promise.all(tasksToAssign.map(async task => {
+            const assignee = await findUserByName(task.assigneeName);
+            if (assignee) {
+              await fetch(`/api/tasks/${task.id}/assign`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ assigneeId: assignee.id }),
+              });
+            }
+          }));
         }
         if (tasksWithIds.length > 0) {
           onTasksGenerated(tasksWithIds);
