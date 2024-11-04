@@ -159,7 +159,7 @@ const Task = ({
 
   const handlePriorityClick = (e) => {
     e.stopPropagation();
-    setShowPriorityMenu(!showPriorityMenu);
+    setShowPriorityMenu((prev) => !prev);
   };
 
   const handlePrioritySelect = (newPriority) => (e) => {
