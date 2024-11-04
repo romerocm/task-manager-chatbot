@@ -15,15 +15,16 @@ const API_ENDPOINTS = {
 // Provider-specific prompts
 const PROMPTS = {
   [PROVIDERS.OPENAI]: {
-    taskGeneration: `Analyze the following request and create a list of specific, actionable tasks. 
+    taskGeneration: `Analyze the following request to create tasks, assign them if specified, and place them in the correct column. 
     Response must be a plain JSON array (no markdown, no code blocks) where each object has:
     - "title": A clear, concise task title (max 50 chars)
     - "description": Detailed explanation (max 200 chars)
     - "priority": "high", "medium", or "low"
     - "estimatedTime": estimated completion time in minutes
-    - "status": "todo"
+    - "status": The column where the task should be placed, e.g., "todo", "inProgress", "done"
+    - "assigneeName": (optional) The full name of the person to assign tasks to
     
-    Respond with ONLY the JSON array, no other text or formatting.`,
+    Respond with ONLY the JSON array, no other text or formatting. If tasks are to be assigned, include "assigneeName" in each task object. Ensure tasks are placed in the specified column if mentioned.`,
 
     taskAssignment: `Given the request to assign tasks, determine:
     1. If the request specifies "all tasks" in a particular column
@@ -42,7 +43,8 @@ const PROMPTS = {
       "assignAll": true,
       "specificTasks": [],
       "column": "todo"
-    }
+    },
+      "column": "inProgress"
     
     Or for specific tasks:
     {
@@ -57,10 +59,13 @@ const PROMPTS = {
     taskDeletion: `Given the request to delete tasks, determine:
     1. Whether all tasks should be deleted
     2. Or which specific tasks should be deleted
+    3. The column (status) of the tasks to be deleted, e.g., "todo", "inProgress", "done"
 
     Response must be a JSON object with:
     - "deleteAll": Boolean indicating if all tasks should be deleted
     - "specificTasks": Array of task titles if not deleting all
+    - "deleteLastN": Number of last tasks to delete if specified
+    - "column": The column (status) of the tasks to be deleted, e.g., "todo", "inProgress", "done"
 
     Example format: {
       "deleteAll": false,
@@ -305,6 +310,9 @@ async function processTaskAssignments(prompt, provider = PROVIDERS.OPENAI) {
           task.title.toLowerCase().includes(title.toLowerCase())
         )
       );
+    } else if (!assignmentData.assignAll && assignmentData.specificTasks?.length === 0) {
+      // If no specific tasks are mentioned, assign all tasks in the default column
+      tasksToAssign = allTasks.filter(task => task.status === column);
     }
 
     if (tasksToAssign.length === 0) {
@@ -361,14 +369,24 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
     const allTasks = await getAllTasks();
     let tasksToDelete = [];
 
-    if (deleteData.deleteAll) {
+    if (deleteData.deleteAll && deleteData.column) {
+      tasksToDelete = allTasks.filter(task => task.status === deleteData.column);
+    } else if (deleteData.deleteAll) {
       tasksToDelete = allTasks;
-    } else if (deleteData.specificTasks?.length > 0) {
+    } else if (deleteData.specificTasks?.length > 0 && deleteData.column) {
+      tasksToDelete = allTasks.filter(task => 
+        task.status === deleteData.column &&
+        deleteData.specificTasks.some((title) =>
+          task.title.toLowerCase().includes(title.toLowerCase())
+        )
+      );
       tasksToDelete = allTasks.filter((task) =>
         deleteData.specificTasks.some((title) =>
           task.title.toLowerCase().includes(title.toLowerCase())
         )
       );
+    } else if (deleteData.deleteLastN) {
+      tasksToDelete = allTasks.slice(-deleteData.deleteLastN);
     }
 
     if (tasksToDelete.length === 0) {
@@ -408,6 +426,7 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
 }
 
 export {
+  findUserByName,
   generateTasks,
   processTaskAssignments,
   processTaskDeletions,

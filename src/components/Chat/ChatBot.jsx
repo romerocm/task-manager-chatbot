@@ -1,7 +1,7 @@
 // src/components/Chat/ChatBot.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Send, Trash2 } from "lucide-react";
-import {
+import { findUserByName,
   generateTasks,
   processTaskAssignments,
   processTaskDeletions,
@@ -16,7 +16,9 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [lastDeletedTasks, setLastDeletedTasks] = useState([]);
   const messagesEndRef = useRef(null);
+  const [lastCreatedTasks, setLastCreatedTasks] = useState([]);
 
   // Check API configuration on component mount
   useEffect(() => {
@@ -60,6 +62,12 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "is responsible for",
       "assign all",
       "assign everything",
+      "delete last",
+      "remove last",
+      "clear last",
+      "undo",
+      "revert",
+      "restore",
     ];
 
     return assignmentKeywords.some((keyword) =>
@@ -76,9 +84,25 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       "get rid of",
     ];
 
-    return deletionKeywords.some((keyword) =>
+    const columnKeywords = {
+      "in progress": "inprogress",
+      "inprogress": "inprogress",
+      "to do": "todo",
+      "todo": "todo",
+      "done": "done",
+    };
+
+    const isDeletion = deletionKeywords.some((keyword) =>
       input.toLowerCase().includes(keyword.toLowerCase())
     );
+
+    const column = Object.keys(columnKeywords).find((col) =>
+      input.toLowerCase().includes(col)
+    );
+
+    return { isDeletion, column: column ? columnKeywords[column] : null };
+
+    return { isDeletion, column };
   };
 
   const handleSend = async () => {
@@ -102,11 +126,40 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
 
     try {
       const isAssignmentRequest = parseAssignmentIntent(input);
-      const isDeletionRequest = parseDeletionIntent(input);
+      const { isDeletion, column } = parseDeletionIntent(input);
 
-      if (isDeletionRequest) {
+      if (isDeletion) {
         console.log("Processing deletion request:", input);
-        const result = await processTaskDeletions(input);
+        let result;
+        if (column) {
+          // Fetch tasks in the specified column
+          const response = await fetch("/api/tasks");
+          const data = await response.json();
+          if (!data.success) throw new Error("Failed to fetch tasks");
+
+          const tasksToDelete = data.tasks
+            .filter((task) => task.status.toLowerCase() === column)
+            .map((task) => task.id);
+
+          if (tasksToDelete.length > 0) {
+            result = await fetch("/api/tasks/delete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ taskIds: tasksToDelete }),
+            }).then((res) => res.json());
+
+            if (!result.success) {
+              throw new Error(result.error || "Failed to delete tasks");
+            }
+
+            setLastDeletedTasks(tasksToDelete);
+          } else {
+            throw new Error(`No tasks found in the "${column}" column`);
+          }
+        } else {
+          result = await processTaskDeletions(input);
+          setLastDeletedTasks(result.data?.deletedTasks || []);
+        }
 
         if (!result || !result.success) {
           throw new Error(result?.error || "Failed to process deletions");
@@ -123,12 +176,20 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
-        if (result.data?.tasksUpdated && boardRef.current?.fetchTasks) {
+        if (boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
         }
       } else if (isAssignmentRequest) {
         console.log("Processing assignment request:", input);
-        const result = await processTaskAssignments(input);
+        let result;
+        if (input.toLowerCase().includes("those") && lastCreatedTasks.length > 0) {
+          const taskTitles = lastCreatedTasks.map((task) => task.title);
+          result = await processTaskAssignments(
+            `assign ${taskTitles.join(", ")} to ${input.split("to")[1].trim()}`
+          );
+        } else {
+          result = await processTaskAssignments(input);
+        }
 
         if (!result.success) {
           throw new Error(result.error || "Failed to process assignments");
@@ -148,6 +209,49 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         if (result.data.tasksUpdated && boardRef.current?.fetchTasks) {
           await boardRef.current.fetchTasks();
         }
+      } else if (input.toLowerCase().includes("undo")) {
+        if (lastDeletedTasks.length > 0) {
+          console.log("Restoring last deleted tasks");
+          const response = await fetch("/api/tasks/restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tasks: lastDeletedTasks }),
+          });
+
+          const result = await response.json();
+          if (!result || !result.success) {
+            throw new Error(result?.error || "Failed to restore tasks");
+          }
+
+          const restoreMessage = {
+            id: Date.now() + 1,
+            text: `Restored ${lastDeletedTasks.length} task${
+              lastDeletedTasks.length !== 1 ? "s" : ""
+            } successfully.`,
+            sender: "ai",
+          };
+          setMessages((prev) => {
+            const updatedMessages = [...prev, restoreMessage];
+            localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+            return updatedMessages;
+          });
+
+          if (boardRef.current?.fetchTasks) {
+            await boardRef.current.fetchTasks();
+          }
+          setLastDeletedTasks([]);
+        } else {
+          const noTasksMessage = {
+            id: Date.now() + 1,
+            text: "No tasks to restore.",
+            sender: "ai",
+          };
+          setMessages((prev) => {
+            const updatedMessages = [...prev, noTasksMessage];
+            localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+            return updatedMessages;
+          });
+        }
       } else {
         // Handle regular task generation
         const result = await generateTasks(input);
@@ -156,12 +260,26 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           throw new Error(result.error || "Failed to generate tasks");
         }
 
-        const tasks = result.data;
+        const tasks = await Promise.all(result.data.map(async (task) => {
+          if (task.assigneeName) {
+            task.assignee = await findUserByName(task.assigneeName);
+          }
+          return task;
+        }));
+
+        // Fetch the newly created tasks to ensure we have their IDs
+        const updatedTasks = await fetch("/api/tasks").then(res => res.json()).then(data => data.tasks);
+
+        const tasksWithIds = tasks.map(task => {
+          const matchedTask = updatedTasks.find(t => t.title === task.title);
+          return { ...task, id: matchedTask ? matchedTask.id : undefined };
+        });
+
         const aiMessage = {
           id: Date.now() + 1,
           text: `I've created ${
-            tasks.length
-          } tasks based on your request:\n${tasks
+            tasksWithIds.length
+          } tasks based on your request:\n${tasksWithIds
             .map((t) => `- ${t.title}`)
             .join("\n")}`,
           sender: "ai",
@@ -173,8 +291,25 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           return updatedMessages;
         });
 
-        if (tasks.length > 0) {
-          onTasksGenerated(tasks);
+        setLastCreatedTasks(tasksWithIds);
+
+        const tasksToAssign = tasksWithIds.filter(
+          (task) => task.assigneeName && task.id
+        );
+        if (tasksToAssign.length > 0) {
+          await Promise.all(tasksToAssign.map(async task => {
+            const assignee = await findUserByName(task.assigneeName);
+            if (assignee) {
+              await fetch(`/api/tasks/${task.id}/assign`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ assigneeId: assignee.id }),
+              });
+            }
+          }));
+        }
+        if (tasksWithIds.length > 0) {
+          onTasksGenerated(tasksWithIds);
         }
       }
     } catch (error) {
