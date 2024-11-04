@@ -7,6 +7,7 @@ import {
   X,
   Check,
   Keyboard,
+  MoreVertical,
 } from "lucide-react";
 import Avatar from "../ui/Avatar";
 
@@ -271,7 +272,7 @@ const Task = ({
           </div>
           <button
             onClick={handleAssignClick}
-            className="flex-shrink-0 p-1 hover:bg-gray-100 rounded"
+            className="flex-shrink-0 p-1 hover:bg-blue-100 rounded transition-colors duration-200"
             title={assignee_name || "Assign task"}
           >
             {assignee_name ? (
@@ -319,14 +320,14 @@ const Task = ({
               <>
                 <button
                   onClick={handleSaveEdit}
-                  className="p-1.5 rounded hover:bg-green-100 text-green-600"
+                  className="p-1.5 rounded hover:bg-green-200 text-green-700 transition-colors duration-200"
                   title="Save changes (Shift + Enter)"
                 >
                   <Check size={16} />
                 </button>
                 <button
                   onClick={handleCancelEdit}
-                  className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
+                  className="p-1.5 rounded hover:bg-gray-200 text-gray-700 transition-colors duration-200"
                   title="Cancel editing (Esc)"
                 >
                   <X size={16} />
@@ -336,7 +337,7 @@ const Task = ({
               <>
                 <button
                   onClick={handleEditClick}
-                  className="p-1.5 rounded hover:bg-blue-100 text-blue-600 
+                  className="p-1.5 rounded hover:bg-blue-200 text-blue-700 transition-colors duration-200
                     opacity-0 group-hover:opacity-100 
                     transition-all duration-200 ease-in-out"
                   title="Edit task"
@@ -346,7 +347,7 @@ const Task = ({
                 <button
                   onClick={handleDeleteClick}
                   disabled={isDeleting}
-                  className={`p-1.5 rounded hover:bg-red-100 text-red-500 
+                  className={`p-1.5 rounded hover:bg-red-200 text-red-600 transition-colors duration-200
                     opacity-0 group-hover:opacity-100
                     transition-all duration-200 ease-in-out
                     ${isDeleting ? "cursor-not-allowed" : ""}`}
