@@ -12,11 +12,11 @@ import TaskAssignmentModal from "./TaskAssignmentModal";
 const RippleEffect = ({ x, y, onAnimationEnd }) => {
   return (
     <div
-      className="absolute w-4 h-4 rounded-full bg-blue-400/20 pointer-events-none"
+      className="absolute w-2 h-2 rounded-full bg-blue-400/20 pointer-events-none shadow-neumorphism"
       style={{
         left: x - 8, // Center the ripple (half of width)
         top: y - 8, // Center the ripple (half of height)
-        animation: "ripple 0.8s ease-out forwards",
+        animation: "ripple 0.6s ease-out forwards",
       }}
       onAnimationEnd={onAnimationEnd}
     />
@@ -505,9 +505,13 @@ const Board = forwardRef((props, ref) => {
               opacity: 1;
             }
             100% {
-              transform: scale(50);
+              transform: scale(20);
               opacity: 0;
             }
+          }
+
+          .shadow-neumorphism {
+            box-shadow: 8px 8px 16px #d1d9e6, -8px -8px 16px #ffffff;
           }
         `}
       </style>
