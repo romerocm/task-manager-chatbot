@@ -26,6 +26,7 @@ const PROMPTS = {
     Respond with ONLY the JSON array, no other text or formatting.`,
 
     taskAssignment: `Given the request to assign tasks, determine:
+    1. If the request specifies "all tasks" in a particular column
     1. The assignee name from the request
     2. Which tasks should be assigned
     3. The column (status) of the tasks to be assigned
@@ -34,7 +35,7 @@ const PROMPTS = {
     - "assigneeName": The full name of the person to assign tasks to
     - "assignAll": Boolean indicating if all tasks should be assigned
     - "specificTasks": Array of task titles if not assigning all tasks
-    - "column": The column (status) of the tasks to be assigned
+    - "column": The column (status) of the tasks to be assigned, e.g., "todo"
 
     Example format: {
       "assigneeName": "Carlos Romero",
