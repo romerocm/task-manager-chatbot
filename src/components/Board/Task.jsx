@@ -272,7 +272,7 @@ const Task = ({
             </button>
 
             {showPriorityMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border p-1 z-10">
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border p-1 z-50">
                 {Object.keys(PRIORITY_COLORS).map((p) => (
                   <button
                     key={p}
