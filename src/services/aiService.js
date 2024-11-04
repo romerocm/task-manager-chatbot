@@ -15,16 +15,16 @@ const API_ENDPOINTS = {
 // Provider-specific prompts
 const PROMPTS = {
   [PROVIDERS.OPENAI]: {
-    taskGeneration: `Analyze the following request to create tasks and assign them if specified. 
+    taskGeneration: `Analyze the following request to create tasks, assign them if specified, and place them in the correct column. 
     Response must be a plain JSON array (no markdown, no code blocks) where each object has:
     - "title": A clear, concise task title (max 50 chars)
     - "description": Detailed explanation (max 200 chars)
     - "priority": "high", "medium", or "low"
     - "estimatedTime": estimated completion time in minutes
-    - "status": "todo"
+    - "status": The column where the task should be placed, e.g., "todo", "inProgress", "done"
     - "assigneeName": (optional) The full name of the person to assign tasks to
     
-    Respond with ONLY the JSON array, no other text or formatting. If tasks are to be assigned, include "assigneeName" in each task object.`,
+    Respond with ONLY the JSON array, no other text or formatting. If tasks are to be assigned, include "assigneeName" in each task object. Ensure tasks are placed in the specified column if mentioned.`,
 
     taskAssignment: `Given the request to assign tasks, determine:
     1. If the request specifies "all tasks" in a particular column
