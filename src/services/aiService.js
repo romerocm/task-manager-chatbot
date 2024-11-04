@@ -379,17 +379,17 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
     });
 
     const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || "Failed to delete tasks");
+    if (!result || !result.success) {
+      throw new Error(result?.error || "Failed to delete tasks");
     }
+
+    const deletedCount = result.tasks?.length || 0;
 
     return {
       success: true,
       data: {
-        deletedCount: result.tasks.length,
-        message: `Deleted ${result.tasks.length} task${
-          result.tasks.length !== 1 ? "s" : ""
-        }`,
+        deletedCount,
+        message: `Deleted ${deletedCount} task${deletedCount !== 1 ? "s" : ""}`,
         tasksUpdated: true,
       },
     };
