@@ -401,7 +401,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
             className={`p-2 rounded-lg ${
               isLoading || !input.trim()
                 ? "bg-gray-300 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600 text-white"
+                : "bg-gradient-to-r from-blue-100 to-purple-100 hover:from-blue-200 hover:to-purple-200 text-white"
             }`}
           >
             <Send size={20} />
