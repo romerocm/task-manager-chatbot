@@ -373,7 +373,13 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
       tasksToDelete = allTasks.filter(task => task.status === deleteData.column);
     } else if (deleteData.deleteAll) {
       tasksToDelete = allTasks;
-    } else if (deleteData.specificTasks?.length > 0) {
+    } else if (deleteData.specificTasks?.length > 0 && deleteData.column) {
+      tasksToDelete = allTasks.filter(task => 
+        task.status === deleteData.column &&
+        deleteData.specificTasks.some((title) =>
+          task.title.toLowerCase().includes(title.toLowerCase())
+        )
+      );
       tasksToDelete = allTasks.filter((task) =>
         deleteData.specificTasks.some((title) =>
           task.title.toLowerCase().includes(title.toLowerCase())
