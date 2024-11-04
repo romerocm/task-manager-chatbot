@@ -1,3 +1,4 @@
+// src/components/Board/Board.jsx - Part 1
 import React, {
   useState,
   useEffect,
@@ -7,6 +8,20 @@ import React, {
 import Task from "./Task";
 import confetti from "canvas-confetti";
 import TaskAssignmentModal from "./TaskAssignmentModal";
+
+const RippleEffect = ({ x, y, onAnimationEnd }) => {
+  return (
+    <div
+      className="absolute w-4 h-4 rounded-full bg-blue-400/20 pointer-events-none"
+      style={{
+        left: x - 8, // Center the ripple (half of width)
+        top: y - 8, // Center the ripple (half of height)
+        animation: "ripple 0.8s ease-out forwards",
+      }}
+      onAnimationEnd={onAnimationEnd}
+    />
+  );
+};
 
 const Board = forwardRef((props, ref) => {
   const [columns, setColumns] = useState([
@@ -19,6 +34,7 @@ const Board = forwardRef((props, ref) => {
   const [draggedTask, setDraggedTask] = useState(null);
   const [dragOverTask, setDragOverTask] = useState(null);
   const [dragPosition, setDragPosition] = useState(null);
+  const [ripples, setRipples] = useState([]);
 
   const [isFreshBoard, setIsFreshBoard] = useState(() => {
     const storedValue = localStorage.getItem("tasksAdded");
@@ -47,7 +63,7 @@ const Board = forwardRef((props, ref) => {
             ...col,
             tasks: col.tasks.map((task, index) => ({
               ...task,
-              zIndex: col.tasks.length - index, // Higher z-index for tasks higher in the list
+              zIndex: col.tasks.length - index,
             })),
           }))
         );
@@ -112,7 +128,7 @@ const Board = forwardRef((props, ref) => {
         if (data.success) {
           await fetchTasks();
           // Trigger confetti when a task is moved to the "Done" column
-          if (newTasks.some(task => task.status === "done")) {
+          if (newTasks.some((task) => task.status === "done")) {
             confetti({
               particleCount: 100,
               spread: 70,
@@ -143,6 +159,32 @@ const Board = forwardRef((props, ref) => {
       }
     },
   }));
+
+  // src/components/Board/Board.jsx - Part 2
+
+  const handleColumnDoubleClick = (e, columnId) => {
+    // Only create ripple if clicking the column background (not on tasks)
+    if (e.target.closest(".task-card")) return;
+
+    // Get position relative to the column
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Add new ripple with unique ID
+    const newRipple = {
+      id: Date.now(),
+      x,
+      y,
+      columnId,
+    };
+
+    setRipples((prev) => [...prev, newRipple]);
+  };
+
+  const removeRipple = (rippleId) => {
+    setRipples((prev) => prev.filter((r) => r.id !== rippleId));
+  };
 
   const handleDragStart = (e, taskId, columnId) => {
     e.dataTransfer.setData("taskId", taskId);
@@ -194,7 +236,6 @@ const Board = forwardRef((props, ref) => {
     const taskId = e.dataTransfer.getData("taskId");
     const sourceColumnId = e.dataTransfer.getData("sourceColumnId");
 
-    // Find source and target columns
     const sourceColumn = columns.find((col) => col.id === sourceColumnId);
     const targetColumn = columns.find((col) => col.id === targetColumnId);
 
@@ -205,59 +246,53 @@ const Board = forwardRef((props, ref) => {
     );
     if (draggedTaskIndex === -1) return;
 
-    // Get the dragged task
     const draggedTask = sourceColumn.tasks[draggedTaskIndex];
 
-    // If dropping in the same column, reorder tasks
     if (sourceColumnId === targetColumnId) {
       const tasks = [...sourceColumn.tasks];
-      // Remove the dragged task
       tasks.splice(draggedTaskIndex, 1);
 
-      // Determine insert position
       let insertIndex;
-      if (!dragOverTask || (typeof dragOverTask === "string" && dragOverTask.startsWith("column-end-"))) {
-        // If dropping at the end of a column
+      if (
+        !dragOverTask ||
+        (typeof dragOverTask === "string" &&
+          dragOverTask.startsWith("column-end-"))
+      ) {
         insertIndex = tasks.length;
       } else {
-        // Find the target task index for dropping between tasks
         const targetIndex = tasks.findIndex(
           (t) => t.id === parseInt(dragOverTask)
         );
-        if (targetIndex > -1) {
-          // If dropping on top of a task, place before or after based on drop position
-          insertIndex =
-            dragPosition === "bottom" ? targetIndex + 1 : targetIndex;
-        } else {
-          // Fallback to end of list if target not found
-          insertIndex = tasks.length;
-        }
+        insertIndex =
+          targetIndex > -1
+            ? dragPosition === "bottom"
+              ? targetIndex + 1
+              : targetIndex
+            : tasks.length;
       }
 
-      // Insert the task at the new position
       tasks.splice(insertIndex, 0, draggedTask);
 
-      // Update local state immediately
       setColumns(
         columns.map((col) =>
           col.id === sourceColumnId ? { ...col, tasks } : col
         )
       );
 
-      // Persist the new order
       await updateTaskPositions(targetColumnId, tasks);
     } else {
-      // Moving between columns
       try {
         const sourceTasks = [...sourceColumn.tasks];
         const targetTasks = [...targetColumn.tasks];
 
-        // Remove from source column
         sourceTasks.splice(draggedTaskIndex, 1);
 
-        // Determine target insert position
         let insertIndex;
-        if (!dragOverTask || (typeof dragOverTask === "string" && dragOverTask.startsWith("column-end-"))) {
+        if (
+          !dragOverTask ||
+          (typeof dragOverTask === "string" &&
+            dragOverTask.startsWith("column-end-"))
+        ) {
           insertIndex = targetTasks.length;
         } else {
           const targetIndex = targetTasks.findIndex(
@@ -271,10 +306,8 @@ const Board = forwardRef((props, ref) => {
               : targetTasks.length;
         }
 
-        // Insert into target column
         targetTasks.splice(insertIndex, 0, draggedTask);
 
-        // Update task status and position in database
         const response = await fetch(`/api/tasks/${taskId}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -285,13 +318,11 @@ const Board = forwardRef((props, ref) => {
         });
 
         if (response.ok) {
-          // Update positions in both columns
           await Promise.all([
             updateTaskPositions(sourceColumnId, sourceTasks),
             updateTaskPositions(targetColumnId, targetTasks),
           ]);
 
-          // Update local state
           setColumns((prevColumns) =>
             prevColumns.map((col) => {
               if (col.id === sourceColumnId) {
@@ -303,7 +334,7 @@ const Board = forwardRef((props, ref) => {
               return col;
             })
           );
-          // Trigger confetti only if "In Progress" is cleared and moved to "Done"
+
           if (
             sourceColumnId === "inProgress" &&
             targetColumnId === "done" &&
@@ -390,33 +421,6 @@ const Board = forwardRef((props, ref) => {
     }
   };
 
-  const handleAssignTask = async (taskId, user) => {
-    try {
-      const success = await ref.current.assignTask(taskId, user);
-      if (success) {
-        setColumns(
-          columns.map((col) => ({
-            ...col,
-            tasks: col.tasks.map((task) =>
-              task.id === taskId
-                ? {
-                    ...task,
-                    assignee_id: user.id,
-                    assignee_name: user.name,
-                    assignee_email: user.email,
-                    assignee_avatar: user.avatar_url,
-                  }
-                : task
-            ),
-          }))
-        );
-      }
-    } catch (error) {
-      console.error("Error in handleAssignTask:", error);
-    }
-    setIsAssignmentModalOpen(false);
-  };
-
   const handleDeleteTask = async (taskId) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -428,17 +432,14 @@ const Board = forwardRef((props, ref) => {
 
       const data = await response.json();
       if (data.success) {
-        // Find the column containing the deleted task
         const columnWithTask = columns.find((col) =>
           col.tasks.some((task) => task.id === taskId)
         );
 
         if (columnWithTask) {
-          // Get remaining tasks in the column
           const remainingTasks = columnWithTask.tasks.filter(
             (task) => task.id !== taskId
           );
-          // Update positions for remaining tasks
           await updateTaskPositions(columnWithTask.id, remainingTasks);
         }
 
@@ -459,20 +460,83 @@ const Board = forwardRef((props, ref) => {
     }
   };
 
+  const handleAssignTask = async (taskId, user) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/assign`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assigneeId: user.id }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setColumns(
+          columns.map((col) => ({
+            ...col,
+            tasks: col.tasks.map((task) =>
+              task.id === taskId
+                ? {
+                    ...task,
+                    assignee_id: user.id,
+                    assignee_name: user.name,
+                    assignee_email: user.email,
+                    assignee_avatar: user.avatar_url,
+                  }
+                : task
+            ),
+          }))
+        );
+        return true;
+      }
+    } catch (error) {
+      console.error("Error in handleAssignTask:", error);
+      return false;
+    }
+    setIsAssignmentModalOpen(false);
+  };
+
   return (
     <>
+      <style>
+        {`
+          @keyframes ripple {
+            0% {
+              transform: scale(0);
+              opacity: 1;
+            }
+            100% {
+              transform: scale(50);
+              opacity: 0;
+            }
+          }
+        `}
+      </style>
       <div className="flex gap-6">
         {columns.map((column) => (
           <div
             key={column.id}
-            className="w-80 bg-gray-50 rounded-lg p-4"
+            className="relative w-80 bg-gray-50 rounded-lg p-4 overflow-hidden"
             onDragOver={(e) => handleColumnDragOver(e, column.id)}
             onDrop={(e) => handleDrop(e, column.id)}
             onDragLeave={handleDragLeave}
+            onDoubleClick={(e) => handleColumnDoubleClick(e, column.id)}
           >
+            {/* Render ripples for this column */}
+            {ripples
+              .filter((r) => r.columnId === column.id)
+              .map((ripple) => (
+                <RippleEffect
+                  key={ripple.id}
+                  x={ripple.x}
+                  y={ripple.y}
+                  onAnimationEnd={() => removeRipple(ripple.id)}
+                />
+              ))}
+
             <h2 className="font-semibold mb-4 text-gray-700">
               {column.title} ({column.tasks.length})
             </h2>
+
             <div className="space-y-2 min-h-[50px]">
               {isFreshBoard && column.tasks.length === 0 && (
                 <div className="text-center text-gray-500 py-4">
