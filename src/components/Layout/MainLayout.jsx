@@ -20,7 +20,6 @@ const MainLayout = () => {
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center">
             <img src="/src/assets/images/logo.png" alt="Logo" className="h-8 w-8 mr-2" />
-            <h1 className="text-2xl font-bold text-gray-800">Task Manager</h1>
           </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
