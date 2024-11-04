@@ -19,7 +19,7 @@ const MainLayout = () => {
       <div className="flex-1 p-6 overflow-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center">
-            <img src="/src/assets/images/logo.png" alt="Logo" className="h-8 w-8 mr-2" />
+            <img src="/src/assets/images/logo.svg" alt="Logo" className="h-8 w-8 mr-2" />
           </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
