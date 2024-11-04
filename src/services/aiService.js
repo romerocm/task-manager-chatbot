@@ -353,7 +353,7 @@ async function processTaskDeletions(prompt, provider = PROVIDERS.OPENAI) {
       throw new Error(aiResult.error || "Failed to process deletion request");
     }
 
-    const deleteData = aiResult.data;
+    const deleteData = aiResult.data || {};
     const allTasks = await getAllTasks();
     let tasksToDelete = [];
 
