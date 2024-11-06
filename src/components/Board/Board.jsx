@@ -629,15 +629,7 @@ const Board = forwardRef((props, ref) => {
         onAssign={handleAssignTask}
       />
       <ComboEffect 
-        onComboEnd={(comboCount) => {
-          if (comboCount >= 5) {
-            confetti({
-              particleCount: 200,
-              spread: 100,
-              origin: { y: 0.6 },
-            });
-          }
-        }}
+        onComboEnd={() => {}}
       />
     </>
   );
