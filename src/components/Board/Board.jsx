@@ -8,6 +8,7 @@ import React, {
 import Task from "./Task";
 import confetti from "canvas-confetti";
 import TaskAssignmentModal from "./TaskAssignmentModal";
+import ComboEffect from "./ComboEffect";
 
 const RippleEffect = ({ x, y, onAnimationEnd }) => {
   return (
@@ -335,16 +336,11 @@ const Board = forwardRef((props, ref) => {
             })
           );
 
-          if (
-            sourceColumnId === "inProgress" &&
-            targetColumnId === "done" &&
-            sourceTasks.length === 0
-          ) {
-            confetti({
-              particleCount: 200,
-              spread: 100,
-              origin: { y: 0.6 },
-            });
+          // Find ComboEffect component's DOM element and call its triggerCombo method
+          const comboEffect = document.querySelector('[data-combo-effect]');
+          if (targetColumnId === "done") {
+            // Using custom event to communicate with ComboEffect component
+            window.dispatchEvent(new CustomEvent('taskCompletedCombo'));
           }
         }
       } catch (error) {
@@ -612,6 +608,17 @@ const Board = forwardRef((props, ref) => {
         onClose={() => setIsAssignmentModalOpen(false)}
         task={selectedTask}
         onAssign={handleAssignTask}
+      />
+      <ComboEffect 
+        onComboEnd={(comboCount) => {
+          if (comboCount >= 5) {
+            confetti({
+              particleCount: 200,
+              spread: 100,
+              origin: { y: 0.6 },
+            });
+          }
+        }}
       />
     </>
   );
