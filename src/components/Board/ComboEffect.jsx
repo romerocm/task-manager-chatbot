@@ -80,12 +80,16 @@ const ComboEffect = ({ onComboEnd }) => {
         animation: 'bounce 0.5s ease-in-out',
       }}
     >
-      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full shadow-lg">
-        <div className="text-xl font-bold">
-          {combo}x COMBO!
+      <div className="flex items-center gap-3">
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full shadow-lg">
+          <div className="text-xl font-bold">
+            {combo}x COMBO!
+          </div>
         </div>
-        <div className="text-sm mt-1 text-center">
-          {currentMessage}
+        <div className="bg-white/90 text-gray-800 px-4 py-2 rounded-full shadow-lg">
+          <div className="text-sm">
+            {currentMessage}
+          </div>
         </div>
       </div>
     </div>
