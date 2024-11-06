@@ -80,7 +80,7 @@ const ComboEffect = ({ onComboEnd }) => {
         animation: 'bounce 0.5s ease-in-out',
       }}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" style={{ pointerEvents: 'none' }}>
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full shadow-lg">
           <div className="text-xl font-bold">
             {combo}x COMBO!

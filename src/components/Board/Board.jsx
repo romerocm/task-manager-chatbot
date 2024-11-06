@@ -336,23 +336,29 @@ const Board = forwardRef((props, ref) => {
             })
           );
 
-          // Find ComboEffect component's DOM element and call its triggerCombo method
-          const comboEffect = document.querySelector('[data-combo-effect]');
-          if (targetColumnId === "done" || 
-             (sourceColumnId === "inProgress" && targetColumnId === "done")) {
-            // Using custom event to communicate with ComboEffect component
+          // Check if all tasks are now in the "done" column
+          if (targetColumnId === "done") {
             window.dispatchEvent(new CustomEvent('taskCompletedCombo'));
             
-            // Extra celebration for completing tasks from in-progress
-            if (sourceColumnId === "inProgress") {
-              setTimeout(() => {
-                confetti({
-                  particleCount: 150,
-                  spread: 80,
-                  origin: { y: 0.6 },
-                  colors: ['#FFD700', '#FFA500', '#FF4500']
-                });
-              }, 300);
+            // Check if this was the last task to be moved to done
+            const allColumns = columns.map(col => ({
+              ...col,
+              tasks: col.id === sourceColumnId ? sourceTasks : 
+                     col.id === targetColumnId ? targetTasks : 
+                     col.tasks
+            }));
+            
+            const nonDoneTasksExist = allColumns.some(col => 
+              col.id !== "done" && col.tasks.length > 0
+            );
+            
+            if (!nonDoneTasksExist) {
+              confetti({
+                particleCount: 200,
+                spread: 100,
+                origin: { y: 0.6 },
+                colors: ['#FFD700', '#FFA500', '#FF4500']
+              });
             }
           }
         }
