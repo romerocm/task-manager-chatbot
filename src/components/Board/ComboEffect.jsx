@@ -3,10 +3,24 @@ import confetti from 'canvas-confetti';
 
 const COMBO_WINDOW = 5000; // 5 seconds
 
+const messages = [
+  "You're on fire! 🔥",
+  "Crushing it! 💪",
+  "Unstoppable! ⚡",
+  "What a streak! 🌟",
+  "You're amazing! 🎯",
+  "Keep rolling! 🎲",
+  "Fantastic work! 🌈",
+  "You're crushing it! 💫",
+  "Incredible focus! 🎯",
+  "Productivity master! 👑"
+];
+
 const ComboEffect = ({ onComboEnd }) => {
   const [combo, setCombo] = useState(0);
   const [visible, setVisible] = useState(false);
   const [timer, setTimer] = useState(null);
+  const [currentMessage, setCurrentMessage] = useState(messages[0]);
 
   useEffect(() => {
     const handleTaskCompleted = () => triggerCombo();
@@ -17,6 +31,13 @@ const ComboEffect = ({ onComboEnd }) => {
       window.removeEventListener('taskCompletedCombo', handleTaskCompleted);
     };
   }, [timer]);
+
+  useEffect(() => {
+    if (combo >= 2) {
+      const messageIndex = (combo - 2) % messages.length;
+      setCurrentMessage(messages[messageIndex]);
+    }
+  }, [combo]);
 
   const triggerCombo = () => {
     setCombo(prev => {
@@ -51,28 +72,6 @@ const ComboEffect = ({ onComboEnd }) => {
   };
 
   if (!visible || combo < 2) return null;
-
-  const messages = [
-    "You're on fire! 🔥",
-    "Crushing it! 💪",
-    "Unstoppable! ⚡",
-    "What a streak! 🌟",
-    "You're amazing! 🎯",
-    "Keep rolling! 🎲",
-    "Fantastic work! 🌈",
-    "You're crushing it! 💫",
-    "Incredible focus! 🎯",
-    "Productivity master! 👑"
-  ];
-
-  const [currentMessage, setCurrentMessage] = useState(messages[0]);
-
-  useEffect(() => {
-    if (combo >= 2) {
-      const messageIndex = (combo - 2) % messages.length;
-      setCurrentMessage(messages[messageIndex]);
-    }
-  }, [combo]);
 
   return (
     <div
