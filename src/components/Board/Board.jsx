@@ -8,6 +8,7 @@ import React, {
 import Task from "./Task";
 import confetti from "canvas-confetti";
 import TaskAssignmentModal from "./TaskAssignmentModal";
+import ComboEffect from "./ComboEffect";
 
 const RippleEffect = ({ x, y, onAnimationEnd }) => {
   return (
@@ -335,16 +336,30 @@ const Board = forwardRef((props, ref) => {
             })
           );
 
-          if (
-            sourceColumnId === "inProgress" &&
-            targetColumnId === "done" &&
-            sourceTasks.length === 0
-          ) {
-            confetti({
-              particleCount: 200,
-              spread: 100,
-              origin: { y: 0.6 },
-            });
+          // Check if all tasks are now in the "done" column
+          if (targetColumnId === "done") {
+            window.dispatchEvent(new CustomEvent('taskCompletedCombo'));
+            
+            // Check if this was the last task to be moved to done
+            const allColumns = columns.map(col => ({
+              ...col,
+              tasks: col.id === sourceColumnId ? sourceTasks : 
+                     col.id === targetColumnId ? targetTasks : 
+                     col.tasks
+            }));
+            
+            const nonDoneTasksExist = allColumns.some(col => 
+              col.id !== "done" && col.tasks.length > 0
+            );
+            
+            if (!nonDoneTasksExist) {
+              confetti({
+                particleCount: 200,
+                spread: 100,
+                origin: { y: 0.6 },
+                colors: ['#FFD700', '#FFA500', '#FF4500']
+              });
+            }
           }
         }
       } catch (error) {
@@ -612,6 +627,9 @@ const Board = forwardRef((props, ref) => {
         onClose={() => setIsAssignmentModalOpen(false)}
         task={selectedTask}
         onAssign={handleAssignTask}
+      />
+      <ComboEffect 
+        onComboEnd={() => {}}
       />
     </>
   );
