@@ -338,9 +338,22 @@ const Board = forwardRef((props, ref) => {
 
           // Find ComboEffect component's DOM element and call its triggerCombo method
           const comboEffect = document.querySelector('[data-combo-effect]');
-          if (targetColumnId === "done") {
+          if (targetColumnId === "done" || 
+             (sourceColumnId === "inProgress" && targetColumnId === "done")) {
             // Using custom event to communicate with ComboEffect component
             window.dispatchEvent(new CustomEvent('taskCompletedCombo'));
+            
+            // Extra celebration for completing tasks from in-progress
+            if (sourceColumnId === "inProgress") {
+              setTimeout(() => {
+                confetti({
+                  particleCount: 150,
+                  spread: 80,
+                  origin: { y: 0.6 },
+                  colors: ['#FFD700', '#FFA500', '#FF4500']
+                });
+              }, 300);
+            }
           }
         }
       } catch (error) {

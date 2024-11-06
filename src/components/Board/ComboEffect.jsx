@@ -52,17 +52,42 @@ const ComboEffect = ({ onComboEnd }) => {
 
   if (!visible || combo < 2) return null;
 
+  const messages = [
+    "You're on fire! 🔥",
+    "Crushing it! 💪",
+    "Unstoppable! ⚡",
+    "What a streak! 🌟",
+    "You're amazing! 🎯",
+    "Keep rolling! 🎲",
+    "Fantastic work! 🌈",
+    "You're crushing it! 💫",
+    "Incredible focus! 🎯",
+    "Productivity master! 👑"
+  ];
+
+  const [currentMessage, setCurrentMessage] = useState(messages[0]);
+
+  useEffect(() => {
+    if (combo >= 2) {
+      const messageIndex = (combo - 2) % messages.length;
+      setCurrentMessage(messages[messageIndex]);
+    }
+  }, [combo]);
+
   return (
     <div
-      className="fixed bottom-8 right-8 z-50 animate-bounce"
+      className="fixed bottom-8 left-8 z-50 animate-bounce"
       style={{
         animation: 'bounce 0.5s ease-in-out',
       }}
     >
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full shadow-lg">
-        <span className="text-xl font-bold">
+        <div className="text-xl font-bold">
           {combo}x COMBO!
-        </span>
+        </div>
+        <div className="text-sm mt-1 text-center">
+          {currentMessage}
+        </div>
       </div>
     </div>
   );
