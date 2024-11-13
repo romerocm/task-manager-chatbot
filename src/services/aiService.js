@@ -256,7 +256,7 @@ async function generateTasks(
           Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-4-vision-preview",
+          model: "gpt-4-vision-preview-1106",
           messages: messages,
           max_tokens: 1000,
           temperature: 0.7,
