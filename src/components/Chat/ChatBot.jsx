@@ -10,7 +10,7 @@ import {
 import Message from "./Message";
 
 const ChatBot = ({ onTasksGenerated, boardRef }) => {
-  const [pastedImage, setPastedImage] = useState(null);
+  const [pastedImage, setPastedImage] = useState(null); // { file: File, url: string }
   const [messages, setMessages] = useState(() => {
     const savedMessages = localStorage.getItem("chatMessages");
     return savedMessages ? JSON.parse(savedMessages) : [];
@@ -118,15 +118,8 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     for (const item of items) {
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile();
-        setPastedImage(file);
-        // Create a preview URL
         const imageUrl = URL.createObjectURL(file);
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: 'Image pasted. What would you like me to do with this image?',
-          sender: 'ai',
-          imageUrl
-        }]);
+        setPastedImage({ file, url: imageUrl });
         break;
       }
     }
@@ -290,8 +283,11 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         }
       } else {
         // Handle regular task generation
-        const result = await generateTasks(input, PROVIDERS.OPENAI, null, pastedImage);
-        setPastedImage(null); // Clear the image after processing
+        const result = await generateTasks(input, PROVIDERS.OPENAI, null, pastedImage?.file);
+        if (pastedImage) {
+          URL.revokeObjectURL(pastedImage.url);
+          setPastedImage(null);
+        }
 
         if (!result.success) {
           throw new Error(result.error || "Failed to generate tasks");
@@ -423,6 +419,25 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       </div>
 
       <div className="p-4 border-t">
+        {pastedImage && (
+          <div className="mb-2 p-2 border rounded-lg flex items-center gap-2 bg-gray-50">
+            <img 
+              src={pastedImage.url} 
+              alt="Attachment preview" 
+              className="h-12 w-12 object-cover rounded"
+            />
+            <span className="text-sm text-gray-600 flex-1">Image attached</span>
+            <button
+              onClick={() => {
+                URL.revokeObjectURL(pastedImage.url);
+                setPastedImage(null);
+              }}
+              className="p-1 hover:bg-gray-200 rounded"
+            >
+              <Trash2 size={16} className="text-gray-500" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <textarea
             rows="1"
