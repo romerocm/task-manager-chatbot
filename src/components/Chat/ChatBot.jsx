@@ -26,6 +26,15 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
   // Check API configuration on component mount
   useEffect(() => {
     checkApiConfig();
+    
+    // Cleanup function to revoke any object URLs when component unmounts
+    return () => {
+      messages.forEach(message => {
+        if (message.imageUrl) {
+          URL.revokeObjectURL(message.imageUrl);
+        }
+      });
+    };
   }, []);
 
   // Auto-scroll to bottom when new messages are added
@@ -136,6 +145,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
       id: Date.now(),
       text: input,
       sender: "user",
+      imageUrl: pastedImage?.url || null,
     };
 
     setMessages((prev) => {
@@ -397,6 +407,12 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         </div>
         <button
           onClick={() => {
+            // Clean up any existing image URLs before clearing messages
+            messages.forEach(message => {
+              if (message.imageUrl) {
+                URL.revokeObjectURL(message.imageUrl);
+              }
+            });
             setMessages([]);
             localStorage.removeItem("chatMessages");
           }}
