@@ -10,6 +10,7 @@ import {
 import Message from "./Message";
 
 const ChatBot = ({ onTasksGenerated, boardRef }) => {
+  const [pastedImage, setPastedImage] = useState(null);
   const [messages, setMessages] = useState(() => {
     const savedMessages = localStorage.getItem("chatMessages");
     return savedMessages ? JSON.parse(savedMessages) : [];
@@ -110,8 +111,29 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     return { isDeletion, column: column ? columnKeywords[column] : null };
   };
 
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        setPastedImage(file);
+        // Create a preview URL
+        const imageUrl = URL.createObjectURL(file);
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          text: 'Image pasted. What would you like me to do with this image?',
+          sender: 'ai',
+          imageUrl
+        }]);
+        break;
+      }
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !pastedImage) || isLoading) return;
 
     setIsLoading(true);
     setError(null);
@@ -268,7 +290,8 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         }
       } else {
         // Handle regular task generation
-        const result = await generateTasks(input);
+        const result = await generateTasks(input, PROVIDERS.OPENAI, null, pastedImage);
+        setPastedImage(null); // Clear the image after processing
 
         if (!result.success) {
           throw new Error(result.error || "Failed to generate tasks");
@@ -406,7 +429,8 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={getPlaceholderText()}
+            onPaste={handlePaste}
+            placeholder={pastedImage ? "Tell me what to do with this image..." : getPlaceholderText()}
             disabled={isLoading}
             className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             style={{ minHeight: "42px", maxHeight: "120px" }}

@@ -6,6 +6,19 @@ const PROVIDERS = {
   CLAUDE: "claude",
 };
 
+// Function to convert image to base64
+const imageToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64String = reader.result.split(',')[1];
+      resolve(base64String);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 // API endpoints
 const API_ENDPOINTS = {
   [PROVIDERS.OPENAI]: "https://api.openai.com/v1/chat/completions",
@@ -184,7 +197,8 @@ async function getAllTasks() {
 async function generateTasks(
   prompt,
   provider = PROVIDERS.OPENAI,
-  customPrompt = null
+  customPrompt = null,
+  image = null
 ) {
   console.log("generateTasks called with provider:", provider);
   try {
@@ -204,6 +218,37 @@ async function generateTasks(
 
     let response;
     if (provider === PROVIDERS.OPENAI) {
+      const messages = [
+        {
+          role: "system",
+          content: "You are a task management assistant. Always respond with plain JSON only.",
+        }
+      ];
+
+      if (image) {
+        const base64Image = await imageToBase64(image);
+        messages.push({
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`,
+              },
+            },
+            {
+              type: "text",
+              text: `${customPrompt || PROMPTS[PROVIDERS.OPENAI].taskGeneration}\n\nAnalyze this image and ${prompt}`,
+            },
+          ],
+        });
+      } else {
+        messages.push({
+          role: "user",
+          content: `${customPrompt || PROMPTS[PROVIDERS.OPENAI].taskGeneration}\n\nRequest: ${prompt}`,
+        });
+      }
+
       response = await fetch(API_ENDPOINTS[PROVIDERS.OPENAI], {
         method: "POST",
         headers: {
@@ -211,20 +256,8 @@ async function generateTasks(
           Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a task management assistant. Always respond with plain JSON only.",
-            },
-            {
-              role: "user",
-              content: `${
-                customPrompt || PROMPTS[PROVIDERS.OPENAI].taskGeneration
-              }\n\nRequest: ${prompt}`,
-            },
-          ],
+          model: "gpt-4-vision-preview",
+          messages: messages,
           max_tokens: 1000,
           temperature: 0.7,
         }),
