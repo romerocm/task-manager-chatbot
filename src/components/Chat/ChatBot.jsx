@@ -6,6 +6,7 @@ import {
   generateTasks,
   processTaskAssignments,
   processTaskDeletions,
+  PROVIDERS,
 } from "../../services/aiService";
 import Message from "./Message";
 
