@@ -1,6 +1,6 @@
 import React from "react";
 
-const Message = ({ text, sender }) => {
+const Message = ({ text, sender, imageUrl }) => {
   return (
     <div
       className={`flex ${sender === "user" ? "justify-end" : "justify-start"}`}
@@ -13,6 +13,13 @@ const Message = ({ text, sender }) => {
         }`}
         style={{ animation: "fadeIn 0.5s forwards, slideIn 0.5s ease-out" }}
       >
+        {imageUrl && (
+          <img 
+            src={imageUrl} 
+            alt="Pasted content"
+            className="max-w-xs max-h-48 rounded-lg mb-2 object-contain"
+          />
+        )}
         {text}
       </div>
     </div>
