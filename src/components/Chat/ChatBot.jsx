@@ -419,12 +419,16 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
           onClick={() => {
             // Clean up any existing image URLs before clearing messages
             messages.forEach(message => {
-              if (message.imageUrl) {
+              if (message.imageUrl && message.imageUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(message.imageUrl);
               }
             });
             setMessages([]);
             localStorage.removeItem("chatMessages");
+            // Clear any pending pasted image
+            if (pastedImage) {
+              setPastedImage(null);
+            }
           }}
           className="p-2 rounded-lg hover:bg-red-100 transition-colors shadow-md"
           title="Clear Chat"
