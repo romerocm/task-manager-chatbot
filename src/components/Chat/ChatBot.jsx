@@ -128,8 +128,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     for (const item of items) {
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile();
-        const imageUrl = URL.createObjectURL(file);
-        setPastedImage({ file, url: imageUrl });
+        setPastedImage({ file });
         break;
       }
     }
@@ -141,12 +140,23 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     setIsLoading(true);
     setError(null);
 
-    const userMessage = {
+    let userMessage = {
       id: Date.now(),
       text: input,
       sender: "user",
-      imageUrl: pastedImage?.url || null,
+      imageUrl: null
     };
+
+    if (pastedImage?.file) {
+      const reader = new FileReader();
+      await new Promise((resolve) => {
+        reader.onload = () => {
+          userMessage.imageUrl = reader.result;
+          resolve();
+        };
+        reader.readAsDataURL(pastedImage.file);
+      });
+    }
 
     setMessages((prev) => {
       const updatedMessages = [...prev, userMessage];
@@ -439,16 +449,13 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         {pastedImage && (
           <div className="mb-2 p-2 border rounded-lg flex items-center gap-2 bg-gray-50">
             <img 
-              src={pastedImage.url} 
+              src={URL.createObjectURL(pastedImage.file)} 
               alt="Attachment preview" 
               className="h-12 w-12 object-cover rounded"
             />
             <span className="text-sm text-gray-600 flex-1">Image attached</span>
             <button
-              onClick={() => {
-                URL.revokeObjectURL(pastedImage.url);
-                setPastedImage(null);
-              }}
+              onClick={() => setPastedImage(null)}
               className="p-1 hover:bg-gray-200 rounded"
             >
               <Trash2 size={16} className="text-gray-500" />
