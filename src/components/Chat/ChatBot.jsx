@@ -26,6 +26,15 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
   // Check API configuration on component mount
   useEffect(() => {
     checkApiConfig();
+    
+    // Cleanup function to revoke any object URLs when component unmounts
+    return () => {
+      messages.forEach(message => {
+        if (message.imageUrl) {
+          URL.revokeObjectURL(message.imageUrl);
+        }
+      });
+    };
   }, []);
 
   // Auto-scroll to bottom when new messages are added
@@ -119,8 +128,7 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     for (const item of items) {
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile();
-        const imageUrl = URL.createObjectURL(file);
-        setPastedImage({ file, url: imageUrl });
+        setPastedImage({ file });
         break;
       }
     }
@@ -132,11 +140,23 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
     setIsLoading(true);
     setError(null);
 
-    const userMessage = {
+    let userMessage = {
       id: Date.now(),
       text: input,
       sender: "user",
+      imageUrl: null
     };
+
+    if (pastedImage?.file) {
+      const reader = new FileReader();
+      await new Promise((resolve) => {
+        reader.onload = () => {
+          userMessage.imageUrl = reader.result;
+          resolve();
+        };
+        reader.readAsDataURL(pastedImage.file);
+      });
+    }
 
     setMessages((prev) => {
       const updatedMessages = [...prev, userMessage];
@@ -397,8 +417,18 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         </div>
         <button
           onClick={() => {
+            // Clean up any existing image URLs before clearing messages
+            messages.forEach(message => {
+              if (message.imageUrl && message.imageUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(message.imageUrl);
+              }
+            });
             setMessages([]);
             localStorage.removeItem("chatMessages");
+            // Clear any pending pasted image
+            if (pastedImage) {
+              setPastedImage(null);
+            }
           }}
           className="p-2 rounded-lg hover:bg-red-100 transition-colors shadow-md"
           title="Clear Chat"
@@ -423,16 +453,13 @@ const ChatBot = ({ onTasksGenerated, boardRef }) => {
         {pastedImage && (
           <div className="mb-2 p-2 border rounded-lg flex items-center gap-2 bg-gray-50">
             <img 
-              src={pastedImage.url} 
+              src={URL.createObjectURL(pastedImage.file)} 
               alt="Attachment preview" 
               className="h-12 w-12 object-cover rounded"
             />
             <span className="text-sm text-gray-600 flex-1">Image attached</span>
             <button
-              onClick={() => {
-                URL.revokeObjectURL(pastedImage.url);
-                setPastedImage(null);
-              }}
+              onClick={() => setPastedImage(null)}
               className="p-1 hover:bg-gray-200 rounded"
             >
               <Trash2 size={16} className="text-gray-500" />
