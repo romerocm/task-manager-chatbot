@@ -14,11 +14,13 @@ const Message = ({ text, sender, imageUrl }) => {
         style={{ animation: "fadeIn 0.5s forwards, slideIn 0.5s ease-out" }}
       >
         {imageUrl && (
-          <img 
-            src={imageUrl} 
-            alt="Pasted content"
-            className="max-w-xs max-h-48 rounded-lg mb-2 object-contain"
-          />
+          <div className="max-w-full overflow-hidden">
+            <img 
+              src={imageUrl} 
+              alt="Pasted content"
+              className="w-full max-h-48 rounded-lg mb-2 object-contain"
+            />
+          </div>
         )}
         {text}
       </div>
