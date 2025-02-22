@@ -2,9 +2,34 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-// Create a new pool using the DATABASE_URL environment variable
+// Database configuration with fallback to individual parameters if DATABASE_URL is not provided
+const poolConfig = process.env.DATABASE_URL
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl:
+        process.env.DB_SSL === "true"
+          ? {
+              rejectUnauthorized: false, // Required for RDS SSL connections
+            }
+          : false,
+    }
+  : {
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT || "5432"),
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      ssl:
+        process.env.DB_SSL === "true"
+          ? {
+              rejectUnauthorized: false,
+            }
+          : false,
+    };
+
+// Create a new pool using the configuration
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  ...poolConfig,
   // Additional pool configuration
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
